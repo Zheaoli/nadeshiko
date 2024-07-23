@@ -5,12 +5,20 @@ import typer
 from nadeshiko.models.token import Token, TokenType
 
 
+def error_message(expression: str, location: int, message: str) -> str:
+    messages = [f"{expression}\n",
+                f"{' ' * location}^ {message}\n"]
+    return "".join(messages)
+
+
 def new_token(token_type: Optional[TokenType] = None, start: int = 0, end: int = 0) -> Token:
-    return Token(token_type, None, None, start, end - start, None)
+    return Token(token_type, None, None, start, end - start, None, None)
 
 
 def get_number(token: Token) -> int:
-    assert token.type == TokenType.Number
+    if token.type != TokenType.Number:
+        print(error_message(token.original_expression, token.location, "expected number"))
+        exit(1)
     return token.value
 
 
@@ -41,13 +49,17 @@ def tokenize(expression: str) -> Optional[Token]:
             current.value = int("".join(temp))
             current.length = index - current.location
             current.expression = expression[current.location:current.location + current.length]
+            current.original_expression = expression
             continue
         if expression[index] in "+-":
             current.next_token = new_token(TokenType.Punctuator, index, index + 1)
             current = current.next_token
             current.expression = expression[current.location:current.location + current.length]
+            current.original_expression = expression
             index += 1
             continue
+        print(error_message(expression, index, "invalid token"))
+        exit(1)
     current.next_token = new_token(TokenType.EOF, index, index)
     return head.next_token
 

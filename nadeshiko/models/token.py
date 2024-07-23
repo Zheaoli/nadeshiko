@@ -17,3 +17,4 @@ class Token:
     location: Optional[int] = None
     length: Optional[int] = None
     expression: Optional[str] = None
+    original_expression: Optional[str] = None
