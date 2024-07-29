@@ -3,7 +3,7 @@ assert() {
   expected="$1"
   input="$2"
 
-  python nadeshiko/cmd/main.py "$input" > tmp.s || exit
+  python main.py "$input" > tmp.s || exit
   gcc -static -o tmp tmp.s
   ./tmp
   actual="$?"
@@ -19,5 +19,7 @@ assert() {
 assert 0 0
 assert 42 42
 assert 21 '5+20-4'
+assert 41 ' 12 + 34 - 5 '
+
 
 echo OK
