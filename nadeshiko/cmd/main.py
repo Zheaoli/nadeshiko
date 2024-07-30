@@ -10,25 +10,32 @@ app = typer.Typer()
 
 
 def error_message(expression: str, location: int, message: str) -> str:
-    messages = [f"{expression}\n",
-                f"{' ' * location}^ {message}\n"]
+    messages = [f"{expression}\n", f"{' ' * location}^ {message}\n"]
     return "".join(messages)
 
 
-def new_token(token_type: Optional[TokenType] = None, start: int = 0, end: int = 0) -> Token:
+def new_token(
+    token_type: Optional[TokenType] = None, start: int = 0, end: int = 0
+) -> Token:
     return Token(token_type, None, None, start, end - start, None, None)
 
 
 def get_number(token: Token) -> int:
     if token.type != TokenType.Number:
-        print(error_message(token.original_expression, token.location, "expected number"))
+        print(
+            error_message(token.original_expression, token.location, "expected number")
+        )
         exit(1)
     return token.value
 
 
 def get_punctuator_length(expression: str) -> int:
-    if expression.startswith("==") or expression.startswith("!=") or expression.startswith(
-            "<=") or expression.startswith(">="):
+    if (
+        expression.startswith("==")
+        or expression.startswith("!=")
+        or expression.startswith("<=")
+        or expression.startswith(">=")
+    ):
         return 2
     return 1 if expression[0] in string.printable else 0
 
@@ -59,13 +66,17 @@ def tokenize(expression: str) -> Optional[Token]:
                 index += 1
             current.value = int("".join(temp))
             current.length = index - current.location
-            current.expression = expression[current.location:current.location + current.length]
+            current.expression = expression[
+                current.location : current.location + current.length
+            ]
             current.original_expression = expression
             continue
         if (length := get_punctuator_length(expression[index:])) >= 1:
             current.next_token = new_token(TokenType.Punctuator, index, index + length)
             current = current.next_token
-            current.expression = expression[current.location:current.location + current.length]
+            current.expression = expression[
+                current.location : current.location + current.length
+            ]
             current.original_expression = expression
             index += length
             continue
@@ -207,7 +218,7 @@ def generate_asm(node: Node, depth: int) -> (list[str], int):
             result.append(f"  cqo\n")
             result.append(f"  div %rdi, %rax\n")
             return result, depth
-        case NodeType.Equal | NodeType.NotEqual | NodeType.Less| NodeType.LessEqual:
+        case NodeType.Equal | NodeType.NotEqual | NodeType.Less | NodeType.LessEqual:
             result.append(f"  cmp %rdi, %rax\n")
             match node.kind:
                 case NodeType.Equal:
@@ -225,8 +236,7 @@ def generate_asm(node: Node, depth: int) -> (list[str], int):
 
 @app.command(context_settings={"ignore_unknown_options": True})
 def main(expression: str):
-    output_asm = [f"  .global main\n",
-                  f"main:\n"]
+    output_asm = [f"  .global main\n", f"main:\n"]
     assert len(expression) >= 0
     token = tokenize(expression)
     token, node = convert_token_to_node(token)
@@ -238,5 +248,5 @@ def main(expression: str):
     print("".join(output_asm), flush=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app()
