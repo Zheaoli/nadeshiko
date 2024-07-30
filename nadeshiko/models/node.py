@@ -11,6 +11,10 @@ class NodeType(IntEnum):
     Div = 4
     Neg = 5
     Number = 6
+    Equal = 7
+    NotEqual = 8
+    Less = 9
+    LessEqual = 10
 
 
 @dataclass

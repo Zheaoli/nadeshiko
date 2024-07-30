@@ -26,6 +26,13 @@ def get_number(token: Token) -> int:
     return token.value
 
 
+def get_punctuator_length(expression: str) -> int:
+    if expression.startswith("==") or expression.startswith("!=") or expression.startswith(
+            "<=") or expression.startswith(">="):
+        return 2
+    return 1 if expression[0] in string.printable else 0
+
+
 def equal(token: Token, expression: str) -> bool:
     return token.expression == expression
 
@@ -55,12 +62,12 @@ def tokenize(expression: str) -> Optional[Token]:
             current.expression = expression[current.location:current.location + current.length]
             current.original_expression = expression
             continue
-        if expression[index] in string.punctuation:
-            current.next_token = new_token(TokenType.Punctuator, index, index + 1)
+        if (length := get_punctuator_length(expression[index:])) >= 1:
+            current.next_token = new_token(TokenType.Punctuator, index, index + length)
             current = current.next_token
             current.expression = expression[current.location:current.location + current.length]
             current.original_expression = expression
-            index += 1
+            index += length
             continue
         print(error_message(expression, index, "invalid token"))
         exit(1)
@@ -69,6 +76,44 @@ def tokenize(expression: str) -> Optional[Token]:
 
 
 def convert_token_to_node(token: Token) -> tuple[Optional[Token], Optional[Node]]:
+    return convert_equality_to_node(token)
+
+
+def convert_relational_to_node(token: Token) -> tuple[Optional[Token], Optional[Node]]:
+    token, node = convert_add_to_node(token)
+    while True:
+        if equal(token, "<") or equal(token, ">"):
+            next_token, next_node = convert_add_to_node(token.next_token)
+            left_node = node if equal(token, "<") else next_node
+            right_node = next_node if equal(token, "<") else node
+            node = new_binary(NodeType.Less, left_node, right_node)
+            token = next_token
+            continue
+        if equal(token, "<=") or equal(token, ">="):
+            next_token, next_node = convert_add_to_node(token.next_token)
+            left_node = node if equal(token, "<=") else next_node
+            right_node = next_node if equal(token, "<=") else node
+            node = new_binary(NodeType.LessEqual, left_node, right_node)
+            token = next_token
+            continue
+        return token, node
+
+
+def convert_equality_to_node(token: Token) -> tuple[Optional[Token], Optional[Node]]:
+    token, node = convert_relational_to_node(token)
+    while True:
+        if equal(token, "=="):
+            token, right_node = convert_relational_to_node(token.next_token)
+            node = new_binary(NodeType.Equal, node, right_node)
+            continue
+        if equal(token, "!="):
+            token, right_node = convert_relational_to_node(token.next_token)
+            node = new_binary(NodeType.NotEqual, node, right_node)
+            continue
+        return token, node
+
+
+def convert_add_to_node(token: Token) -> tuple[Optional[Token], Optional[Node]]:
     token, node = convert_mul_token(token)
     while True:
         if equal(token, "+"):
@@ -161,6 +206,19 @@ def generate_asm(node: Node, depth: int) -> (list[str], int):
         case NodeType.Div:
             result.append(f"  cqo\n")
             result.append(f"  div %rdi, %rax\n")
+            return result, depth
+        case NodeType.Equal | NodeType.NotEqual | NodeType.Less| NodeType.LessEqual:
+            result.append(f"  cmp %rdi, %rax\n")
+            match node.kind:
+                case NodeType.Equal:
+                    result.append("  sete %al\n")
+                case NodeType.NotEqual:
+                    result.append("  setne %al\n")
+                case NodeType.Less:
+                    result.append("  setl %al\n")
+                case NodeType.LessEqual:
+                    result.append("  setle %al\n")
+            result.append("  movzb %al, %rax\n")
             return result, depth
     raise ValueError("invalid node type")
 
