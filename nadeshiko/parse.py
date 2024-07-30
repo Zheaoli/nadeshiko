@@ -5,7 +5,24 @@ from nadeshiko.node import Node, new_binary, NodeType, new_unary, new_number
 from nadeshiko.token import Token, TokenType, equal, skip
 
 
-def parse(token: Token) -> tuple[Optional[Token], Optional[Node]]:
+def parse_stmt(token: Token) -> Optional[Node]:
+    head = Node(NodeType.ExpressionStmt, None, None, None, None)
+    current = head
+    while token.type != TokenType.EOF:
+        token, node = expression_parse_stmt(token)
+        current.next_node = node
+        current = node
+    return head.next_node
+
+
+def expression_parse_stmt(token: Token) -> tuple[Optional[Token], Optional[Node]]:
+    token, node = expression_parse(token)
+    node = new_unary(NodeType.ExpressionStmt, node)
+    token = skip(token, ";")
+    return token, node
+
+
+def expression_parse(token: Token) -> tuple[Optional[Token], Optional[Node]]:
     return convert_equality_token(token)
 
 
@@ -64,7 +81,7 @@ def convert_unary_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
         return convert_unary_token(token.next_token)
     if equal(token, "-"):
         token, node = convert_unary_token(token.next_token)
-        node = new_unary(node)
+        node = new_unary(NodeType.Neg, node)
         return token, node
     return primary_token(token)
 
@@ -87,7 +104,7 @@ def convert_mul_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
 
 def primary_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
     if equal(token, "("):
-        next_token, node = parse(token.next_token)
+        next_token, node = expression_parse(token.next_token)
         return skip(next_token, ")"), node
     if token.type == TokenType.Number:
         return token.next_token, new_number(token.value)

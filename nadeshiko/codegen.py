@@ -1,6 +1,23 @@
 from nadeshiko.node import Node, NodeType
 
 
+def codegen(node: Node) -> str:
+    result = [f"  .global main\n", f"main:\n"]
+    while node:
+        temp, depth = generate_stmt(node, 0)
+        assert depth == 0
+        result.extend(temp)
+        node = node.next_node
+    result.append("  ret\n")
+    return "".join(result)
+
+
+def generate_stmt(node: Node, depth: int) -> (list[str], int):
+    if node.kind == NodeType.ExpressionStmt:
+        return generate_asm(node.left, depth)
+    raise ValueError("invalid node type")
+
+
 def generate_asm(node: Node, depth: int) -> (list[str], int):
     result = []
     if not node:
