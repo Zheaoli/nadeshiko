@@ -9,7 +9,8 @@ class NodeType(IntEnum):
     Sub = 2
     Mul = 3
     Div = 4
-    Number = 5
+    Neg = 5
+    Number = 6
 
 
 @dataclass
@@ -33,3 +34,7 @@ def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
 
 def new_number(value: int) -> Node:
     return Node(NodeType.Number, None, None, value)
+
+
+def new_unary(node: Node) -> Node:
+    return Node(NodeType.Neg, node, None, None)

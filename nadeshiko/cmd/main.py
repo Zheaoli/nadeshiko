@@ -3,8 +3,10 @@ from typing import Optional
 
 import typer
 
-from nadeshiko.models.node import Node, new_number, new_binary, NodeType
+from nadeshiko.models.node import Node, new_number, new_binary, NodeType, new_unary
 from nadeshiko.models.token import Token, TokenType
+
+app = typer.Typer()
 
 
 def error_message(expression: str, location: int, message: str) -> str:
@@ -82,8 +84,18 @@ def convert_token_to_node(token: Token) -> tuple[Optional[Token], Optional[Node]
         return token, node
 
 
+def convert_unary_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
+    if equal(token, "+"):
+        return convert_unary_token(token.next_token)
+    if equal(token, "-"):
+        token, node = convert_unary_token(token.next_token)
+        node = new_unary(node)
+        return token, node
+    return primary_token(token)
+
+
 def convert_mul_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
-    token, node = primary_token(token)
+    token, node = convert_unary_token(token)
     while True:
         if equal(token, "*"):
             next_token, right_node = primary_token(token.next_token)
@@ -119,9 +131,15 @@ def generate_asm(node: Node, depth: int) -> (list[str], int):
     def pop(register: str, depth: int) -> (list[str], depth):
         return [f"  pop %{register}\n"], depth - 1
 
-    if node.kind == NodeType.Number:
-        result.append(f"  mov ${node.value}, %rax\n")
-        return result, depth
+    match node.kind:
+        case NodeType.Number:
+            result.append(f"  mov ${node.value}, %rax\n")
+            return result, depth
+        case NodeType.Neg:
+            temp_data, depth = generate_asm(node.left, depth)
+            result.extend(temp_data)
+            result.append(f"  neg %rax\n")
+            return result, depth
     temp_data, depth = generate_asm(node.right, depth)
     result.extend(temp_data)
     temp_data, depth = push(depth)
@@ -147,6 +165,7 @@ def generate_asm(node: Node, depth: int) -> (list[str], int):
     raise ValueError("invalid node type")
 
 
+@app.command(context_settings={"ignore_unknown_options": True})
 def main(expression: str):
     output_asm = [f"  .global main\n",
                   f"main:\n"]
@@ -162,4 +181,4 @@ def main(expression: str):
 
 
 if __name__ == '__main__':
-    typer.run(main)
+    app()
