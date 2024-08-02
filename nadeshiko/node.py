@@ -26,7 +26,21 @@ class Node:
     left: Optional["Node"]
     right: Optional["Node"]
     value: Optional[int]
+    var: Optional["Obj"]
+
+
+@dataclass
+class Obj:
+    next_obj: Optional["Obj"]
     name: Optional[str]
+    offset: Optional[int]
+
+
+@dataclass
+class Function:
+    body: Optional[Node]
+    locals_obj: list[Optional["Obj"]]
+    stack_size: Optional[int]
 
 
 def new_node(kind: NodeType) -> Node:
@@ -48,5 +62,9 @@ def new_unary(node_type: NodeType, node: Node) -> Node:
     return Node(node_type, None, node, None, None, None)
 
 
-def new_var_node(name: str) -> Node:
-    return Node(NodeType.Variable, None, None, None, None, name)
+def new_var_node(obj: Obj) -> Node:
+    return Node(NodeType.Variable, None, None, None, None, obj)
+
+
+def new_lvar(name: str, next_obj: Obj) -> Obj:
+    return Obj(next_obj, name, 0)

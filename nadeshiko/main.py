@@ -12,8 +12,8 @@ app = typer.Typer()
 def main(expression: str):
     assert len(expression) >= 0
     token = tokenize(expression)
-    node = parse_stmt(token)
-    result = codegen(node)
+    prog = parse_stmt(token)
+    result = codegen(prog)
 
     print(result, flush=True)
 

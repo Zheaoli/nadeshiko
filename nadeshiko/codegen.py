@@ -1,13 +1,34 @@
-from nadeshiko.node import Node, NodeType
+from nadeshiko.node import Node, NodeType, Function
 
 
-def codegen(node: Node) -> str:
-    result = [f"  .global main\n", f"main:\n"]
-    while node:
-        temp, depth = generate_stmt(node, 0)
+def align_to(offset: int, align: int) -> int:
+    return (offset + align - 1) // align * align
+
+
+def assign_lvar_offsets(prog: Function) -> int:
+    offset = 0
+    for obj in prog.locals_obj[::-1]:
+        offset += 8
+        obj.offset = -offset
+    prog.stack_size = align_to(offset, 16)
+
+
+def codegen(prog: Function) -> str:
+    assign_lvar_offsets(prog)
+    result = [
+        f"  .global main\n",
+        f"main:\n",
+        f"  push %rbp\n",
+        f"  mov %rsp, %rbp\n",
+        f"  sub ${prog.stack_size}, %rsp\n",
+    ]
+    while prog.body:
+        temp, depth = generate_stmt(prog.body, 0)
         assert depth == 0
         result.extend(temp)
-        node = node.next_node
+        prog.body = prog.body.next_node
+    result.append("  mov %rbp, %rsp\n")
+    result.append("  pop %rbp\n")
     result.append("  ret\n")
     return "".join(result)
 
@@ -19,8 +40,7 @@ def generate_stmt(node: Node, depth: int) -> (list[str], int):
 
 
 def generate_address(node: Node) -> str:
-    offset = (ord(node.name) - ord("a") + 1) * 8
-    return f"  lea {-offset}(%rbp), %rax\n"
+    return f"  lea {node.var.offset}(%rbp), %rax\n"
 
 
 def generate_asm(node: Node, depth: int) -> (list[str], int):
