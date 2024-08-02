@@ -38,6 +38,12 @@ def tokenize(expression: str) -> Optional[Token]:
             ]
             current.original_expression = expression
             continue
+        if expression[index].isalpha():
+            current.next_token = new_token(TokenType.Identifier, index, index + 1)
+            current = current.next_token
+            current.expression = expression[index]
+            index += 1
+            continue
         if (length := get_punctuator_length(expression[index:])) >= 1:
             current.next_token = new_token(TokenType.Punctuator, index, index + length)
             current = current.next_token

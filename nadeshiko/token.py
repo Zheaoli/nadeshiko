@@ -9,6 +9,7 @@ class TokenType(IntEnum):
     Punctuator = 1
     Number = 2
     EOF = 3
+    Identifier = 4
 
 
 @dataclass

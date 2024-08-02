@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import IntEnum
-from lib2to3.pytree import Node
 from typing import Optional
 
 
@@ -16,6 +15,8 @@ class NodeType(IntEnum):
     Less = 9
     LessEqual = 10
     ExpressionStmt = 11
+    Assign = 12
+    Variable = 13
 
 
 @dataclass
@@ -25,10 +26,11 @@ class Node:
     left: Optional["Node"]
     right: Optional["Node"]
     value: Optional[int]
+    name: Optional[str]
 
 
 def new_node(kind: NodeType) -> Node:
-    return Node(kind, None, None, None, None)
+    return Node(kind, None, None, None, None, None)
 
 
 def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
@@ -39,8 +41,12 @@ def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
 
 
 def new_number(value: int) -> Node:
-    return Node(NodeType.Number, None, None, None, value)
+    return Node(NodeType.Number, None, None, None, value, None)
 
 
 def new_unary(node_type: NodeType, node: Node) -> Node:
-    return Node(node_type, None, node, None, None)
+    return Node(node_type, None, node, None, None, None)
+
+
+def new_var_node(name: str) -> Node:
+    return Node(NodeType.Variable, None, None, None, None, name)

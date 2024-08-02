@@ -1,12 +1,19 @@
 from typing import Optional
 
 from nadeshiko.helper import error_message
-from nadeshiko.node import Node, new_binary, NodeType, new_unary, new_number
+from nadeshiko.node import (
+    Node,
+    new_binary,
+    NodeType,
+    new_unary,
+    new_number,
+    new_var_node,
+)
 from nadeshiko.token import Token, TokenType, equal, skip
 
 
 def parse_stmt(token: Token) -> Optional[Node]:
-    head = Node(NodeType.ExpressionStmt, None, None, None, None)
+    head = Node(NodeType.ExpressionStmt, None, None, None, None, None)
     current = head
     while token.type != TokenType.EOF:
         token, node = expression_parse_stmt(token)
@@ -23,7 +30,7 @@ def expression_parse_stmt(token: Token) -> tuple[Optional[Token], Optional[Node]
 
 
 def expression_parse(token: Token) -> tuple[Optional[Token], Optional[Node]]:
-    return convert_equality_token(token)
+    return convert_assign_token(token)
 
 
 def convert_relational_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
@@ -44,6 +51,15 @@ def convert_relational_token(token: Token) -> tuple[Optional[Token], Optional[No
             token = next_token
             continue
         return token, node
+
+
+def convert_assign_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
+    token, node = convert_equality_token(token)
+    if equal(token, "="):
+        next_token, next_node = convert_assign_token(token.next_token)
+        node = new_binary(NodeType.Assign, node, next_node)
+        token = next_token
+    return token, node
 
 
 def convert_equality_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
@@ -108,5 +124,7 @@ def primary_token(token: Token) -> tuple[Optional[Token], Optional[Node]]:
         return skip(next_token, ")"), node
     if token.type == TokenType.Number:
         return token.next_token, new_number(token.value)
+    if token.type == TokenType.Identifier:
+        return token.next_token, new_var_node(token.expression)
     print(error_message(token.expression, token.location, "expected an expression"))
     exit(1)
