@@ -32,6 +32,8 @@ def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[
 
 
 def expression_parse_stmt(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+    if equal(token, ";"):
+        return token.next_token, new_node(NodeType.Block)
     token, node = expression_parse(token, local_objs)
     node = new_unary(NodeType.ExpressionStmt, node)
     token = skip(token, ";")
