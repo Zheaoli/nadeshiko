@@ -18,6 +18,7 @@ class NodeType(IntEnum):
     Assign = 12
     Variable = 13
     Return = 14
+    Block = 15
 
 
 @dataclass
@@ -28,6 +29,7 @@ class Node:
     right: Optional["Node"]
     value: Optional[int]
     var: Optional["Obj"]
+    body: Optional["Node"]
 
 
 @dataclass
@@ -45,7 +47,7 @@ class Function:
 
 
 def new_node(kind: NodeType) -> Node:
-    return Node(kind, None, None, None, None, None)
+    return Node(kind, None, None, None, None, None, None)
 
 
 def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
@@ -56,15 +58,15 @@ def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
 
 
 def new_number(value: int) -> Node:
-    return Node(NodeType.Number, None, None, None, value, None)
+    return Node(NodeType.Number, None, None, None, value, None, None)
 
 
 def new_unary(node_type: NodeType, node: Node) -> Node:
-    return Node(node_type, None, node, None, None, None)
+    return Node(node_type, None, node, None, None, None, None)
 
 
 def new_var_node(obj: Obj) -> Node:
-    return Node(NodeType.Variable, None, None, None, None, obj)
+    return Node(NodeType.Variable, None, None, None, None, obj, None)
 
 
 def new_lvar(name: str, next_obj: Obj) -> Obj:

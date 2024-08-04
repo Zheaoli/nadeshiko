@@ -22,11 +22,10 @@ def codegen(prog: Function) -> str:
         f"  mov %rsp, %rbp\n",
         f"  sub ${prog.stack_size}, %rsp\n",
     ]
-    while prog.body:
-        temp, depth = generate_stmt(prog.body, 0)
-        assert depth == 0
-        result.extend(temp)
-        prog.body = prog.body.next_node
+    temp, depth = generate_stmt(prog.body, 0)
+    assert depth == 0
+    result.extend(temp)
+
     result.append(".L.return:\n")
     result.append("  mov %rbp, %rsp\n")
     result.append("  pop %rbp\n")
@@ -45,6 +44,13 @@ def generate_stmt(node: Node, depth: int) -> (list[str], int):
             temp_data, depth = generate_asm(node.left, depth)
             result.extend(temp_data)
             result.append("  jmp .L.return\n")
+            return result, depth
+        case NodeType.Block:
+            node = node.body
+            while node:
+                temp_data, depth = generate_stmt(node, depth)
+                result.extend(temp_data)
+                node = node.next_node
             return result, depth
     raise ValueError("invalid node type")
 

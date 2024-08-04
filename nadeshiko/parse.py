@@ -7,21 +7,17 @@ from nadeshiko.node import (
     NodeType,
     new_unary,
     new_number,
-    new_var_node, Obj, new_lvar, Function,
+    new_var_node, Obj, new_lvar, Function, new_node,
 )
 from nadeshiko.token import Token, TokenType, equal, skip
 
 
 def parse_stmt(token: Token) -> Optional["Function"]:
-    head = Node(NodeType.ExpressionStmt, None, None, None, None, None)
-    current = head
+    token = skip(token, "{")
     local_objs: list[Optional["Obj"]] = [None]
-    while token.type != TokenType.EOF:
-        token, node = parse_stmt_return(token, local_objs)
-        current.next_node = node
-        current = node
+    _, node = convert_compound_stmt(token, local_objs)
     local_objs.pop(0)
-    return Function(head.next_node, local_objs, 0)
+    return Function(node, local_objs, 0)
 
 
 def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
@@ -30,6 +26,8 @@ def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[
         node = new_unary(NodeType.Return, node)
         token = skip(token, ";")
         return token, node
+    if equal(token, "{"):
+        return convert_compound_stmt(token.next_token, local_objs)
     return expression_parse_stmt(token, local_objs)
 
 
@@ -42,6 +40,18 @@ def expression_parse_stmt(token: Token, local_objs: list[Optional["Obj"]]) -> tu
 
 def expression_parse(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
     return convert_assign_token(token, local_objs)
+
+
+def convert_compound_stmt(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+    head = Node(NodeType.Block, None, None, None, None, None, None)
+    current = head
+    while not equal(token, "}"):
+        token, node = parse_stmt_return(token, local_objs)
+        current.next_node = node
+        current = node
+    node = new_node(NodeType.Block)
+    node.body = head.next_node
+    return token.next_token, node
 
 
 def convert_relational_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
