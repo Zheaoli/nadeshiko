@@ -20,6 +20,7 @@ class NodeType(IntEnum):
     Return = 14
     Block = 15
     If = 16
+    ForStmt = 17
 
 
 @dataclass
@@ -34,6 +35,8 @@ class Node:
     condition: Optional["Node"] = None
     then: Optional["Node"] = None
     els: Optional["Node"] = None
+    init: Optional["Node"] = None
+    inc: Optional["Node"] = None
 
 
 @dataclass

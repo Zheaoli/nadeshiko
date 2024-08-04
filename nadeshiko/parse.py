@@ -35,6 +35,19 @@ def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[
         if equal(token, "else"):
             token, node.els = parse_stmt_return(token.next_token, local_objs)
         return token, node
+    if equal(token, "for"):
+        node = new_node(NodeType.ForStmt)
+        token = skip(token.next_token, "(")
+        token, node.init = expression_parse_stmt(token, local_objs)
+        if not equal(token, ";"):
+            token, node.condition = expression_parse(token, local_objs)
+        token = skip(token, ";")
+        if not equal(token, ")"):
+            token, node.inc = expression_parse(token, local_objs)
+        token = skip(token, ")")
+        token, node.then = parse_stmt_return(token, local_objs)
+        return token, node
+
     if equal(token, "{"):
         return convert_compound_stmt(token.next_token, local_objs)
     return expression_parse_stmt(token, local_objs)

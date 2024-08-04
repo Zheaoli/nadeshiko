@@ -57,6 +57,24 @@ def generate_stmt(node: Node, depth: int) -> (list[str], int):
                 result.extend(temp_data)
             result.append(f".L.end{c}:\n")
             return result, depth
+        case NodeType.ForStmt:
+            c = count()
+            temp_data, depth = generate_stmt(node.init, depth)
+            result.extend(temp_data)
+            result.append(f".L.begin{c}:\n")
+            if node.condition:
+                temp_data, depth = generate_asm(node.condition, depth)
+                result.extend(temp_data)
+                result.append(f"  cmp $0, %rax\n")
+                result.append(f"  je .L.end{c}\n")
+            temp_data, depth = generate_stmt(node.then, depth)
+            result.extend(temp_data)
+            if node.inc:
+                temp_data, depth = generate_asm(node.inc, depth)
+                result.extend(temp_data)
+            result.append(f"  jmp .L.begin{c}\n")
+            result.append(f".L.end{c}:\n")
+            return result, depth
 
         case NodeType.ExpressionStmt:
             temp_data, depth = generate_asm(node.left, depth)
