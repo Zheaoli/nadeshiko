@@ -7,7 +7,11 @@ from nadeshiko.node import (
     NodeType,
     new_unary,
     new_number,
-    new_var_node, Obj, new_lvar, Function, new_node,
+    new_var_node,
+    Obj,
+    new_lvar,
+    Function,
+    new_node,
 )
 from nadeshiko.token import Token, TokenType, equal, skip
 
@@ -20,14 +24,16 @@ def parse_stmt(token: Token) -> Optional["Function"]:
     return Function(node, local_objs, 0)
 
 
-def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def parse_stmt_return(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     if equal(token, "return"):
         token, node = expression_parse(token.next_token, local_objs)
-        node = new_unary(NodeType.Return, node)
+        node = new_unary(NodeType.Return, node, token)
         token = skip(token, ";")
         return token, node
     if equal(token, "if"):
-        node = new_node(NodeType.If)
+        node = new_node(NodeType.If, token)
         token = skip(token.next_token, "(")
         token, node.condition = expression_parse(token, local_objs)
         token = skip(token, ")")
@@ -36,14 +42,14 @@ def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[
             token, node.els = parse_stmt_return(token.next_token, local_objs)
         return token, node
     if equal(token, "while"):
-        node = new_node(NodeType.ForStmt)
+        node = new_node(NodeType.ForStmt, token)
         token = skip(token.next_token, "(")
         token, node.condition = expression_parse(token, local_objs)
         token = skip(token, ")")
         token, node.then = parse_stmt_return(token, local_objs)
         return token, node
     if equal(token, "for"):
-        node = new_node(NodeType.ForStmt)
+        node = new_node(NodeType.ForStmt, token)
         token = skip(token.next_token, "(")
         token, node.init = expression_parse_stmt(token, local_objs)
         if not equal(token, ";"):
@@ -60,128 +66,148 @@ def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[
     return expression_parse_stmt(token, local_objs)
 
 
-def expression_parse_stmt(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def expression_parse_stmt(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     if equal(token, ";"):
-        return token.next_token, new_node(NodeType.Block)
+        return token.next_token, new_node(NodeType.Block, token)
     token, node = expression_parse(token, local_objs)
-    node = new_unary(NodeType.ExpressionStmt, node)
+    node = new_unary(NodeType.ExpressionStmt, node, token)
     token = skip(token, ";")
     return token, node
 
 
-def expression_parse(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def expression_parse(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     return convert_assign_token(token, local_objs)
 
 
-def convert_compound_stmt(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
-    head = new_node(NodeType.Block)
+def convert_compound_stmt(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
+    head = new_node(NodeType.Block, token)
     current = head
     while not equal(token, "}"):
         token, node = parse_stmt_return(token, local_objs)
         current.next_node = node
         current = node
-    node = new_node(NodeType.Block)
+    node = new_node(NodeType.Block, token)
     node.body = head.next_node
     return token.next_token, node
 
 
-def convert_relational_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def convert_relational_token(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     token, node = convert_add_token(token, local_objs)
     while True:
         if equal(token, "<") or equal(token, ">"):
             next_token, next_node = convert_add_token(token.next_token, local_objs)
             left_node = node if equal(token, "<") else next_node
             right_node = next_node if equal(token, "<") else node
-            node = new_binary(NodeType.Less, left_node, right_node)
+            node = new_binary(NodeType.Less, left_node, right_node, token)
             token = next_token
             continue
         if equal(token, "<=") or equal(token, ">="):
             next_token, next_node = convert_add_token(token.next_token, local_objs)
             left_node = node if equal(token, "<=") else next_node
             right_node = next_node if equal(token, "<=") else node
-            node = new_binary(NodeType.LessEqual, left_node, right_node)
+            node = new_binary(NodeType.LessEqual, left_node, right_node, token)
             token = next_token
             continue
         return token, node
 
 
-def convert_assign_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def convert_assign_token(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     token, node = convert_equality_token(token, local_objs)
     if equal(token, "="):
         next_token, next_node = convert_assign_token(token.next_token, local_objs)
-        node = new_binary(NodeType.Assign, node, next_node)
+        node = new_binary(NodeType.Assign, node, next_node, token)
         token = next_token
     return token, node
 
 
-def convert_equality_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def convert_equality_token(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     token, node = convert_relational_token(token, local_objs)
     while True:
         if equal(token, "=="):
             token, next_node = convert_relational_token(token.next_token, local_objs)
-            node = new_binary(NodeType.Equal, node, next_node)
+            node = new_binary(NodeType.Equal, node, next_node, token)
             continue
         if equal(token, "!="):
             token, next_node = convert_relational_token(token.next_token, local_objs)
-            node = new_binary(NodeType.NotEqual, node, next_node)
+            node = new_binary(NodeType.NotEqual, node, next_node, token)
             continue
         return token, node
 
 
-def convert_add_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def convert_add_token(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     token, node = convert_mul_token(token, local_objs)
     while True:
         if equal(token, "+"):
             next_token, next_node = convert_mul_token(token.next_token, local_objs)
-            node = new_binary(NodeType.Add, node, next_node)
+            node = new_binary(NodeType.Add, node, next_node, token)
             token = next_token
             continue
         if equal(token, "-"):
             next_token, next_node = convert_mul_token(token.next_token, local_objs)
-            node = new_binary(NodeType.Sub, node, next_node)
+            node = new_binary(NodeType.Sub, node, next_node, token)
             token = next_token
             continue
         return token, node
 
 
-def convert_unary_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def convert_unary_token(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     if equal(token, "+"):
         return convert_unary_token(token.next_token, local_objs)
     if equal(token, "-"):
         token, node = convert_unary_token(token.next_token, local_objs)
-        node = new_unary(NodeType.Neg, node)
+        node = new_unary(NodeType.Neg, node, token)
         return token, node
     return primary_token(token, local_objs)
 
 
-def convert_mul_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def convert_mul_token(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     token, node = convert_unary_token(token, local_objs)
     while True:
         if equal(token, "*"):
             next_token, next_node = primary_token(token.next_token, local_objs)
-            node = new_binary(NodeType.Mul, node, next_node)
+            node = new_binary(NodeType.Mul, node, next_node, token)
             token = next_token
             continue
         if equal(token, "/"):
             next_token, next_node = primary_token(token.next_token, local_objs)
-            node = new_binary(NodeType.Div, node, next_node)
+            node = new_binary(NodeType.Div, node, next_node, token)
             token = next_token
             continue
         return token, node
 
 
-def primary_token(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+def primary_token(
+    token: Token, local_objs: list[Optional["Obj"]]
+) -> tuple[Optional[Token], Optional[Node]]:
     if equal(token, "("):
         next_token, node = expression_parse(token.next_token, local_objs)
         return skip(next_token, ")"), node
     if token.type == TokenType.Number:
-        return token.next_token, new_number(token.value)
+        return token.next_token, new_number(token.value, token)
     if token.type == TokenType.Identifier:
         obj = search_obj(token.expression, local_objs)
         if not obj:
             obj = new_lvar(token.expression, local_objs[-1])
             local_objs.append(obj)
-        return token.next_token, new_var_node(obj)
+        return token.next_token, new_var_node(obj, token)
     print(error_message(token.expression, token.location, "expected an expression"))
     exit(1)
 

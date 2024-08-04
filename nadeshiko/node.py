@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Optional
 
+from nadeshiko.token import Token
+
 
 class NodeType(IntEnum):
     Add = 1
@@ -37,6 +39,7 @@ class Node:
     els: Optional["Node"] = None
     init: Optional["Node"] = None
     inc: Optional["Node"] = None
+    token: Optional["Token"] = None
 
 
 @dataclass
@@ -53,32 +56,33 @@ class Function:
     stack_size: Optional[int]
 
 
-def new_node(kind: NodeType) -> Node:
+def new_node(kind: NodeType, token: Token) -> Node:
     node = Node(kind)
+    node.token = token
     return node
 
 
-def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
-    node = new_node(kind)
+def new_binary(kind: NodeType, left: Node, right: Node, token: Token) -> Node:
+    node = new_node(kind, token)
     node.left = left
     node.right = right
     return node
 
 
-def new_number(value: int) -> Node:
-    node = new_node(NodeType.Number)
+def new_number(value: int, token: Token) -> Node:
+    node = new_node(NodeType.Number, token)
     node.value = value
     return node
 
 
-def new_unary(node_type: NodeType, left_node: Node) -> Node:
-    node = new_node(node_type)
+def new_unary(node_type: NodeType, left_node: Node, token: Token) -> Node:
+    node = new_node(node_type, token)
     node.left = left_node
     return node
 
 
-def new_var_node(obj: Obj) -> Node:
-    node = new_node(NodeType.Variable)
+def new_var_node(obj: Obj, token: Token) -> Node:
+    node = new_node(NodeType.Variable, token)
     node.var = obj
     return node
 

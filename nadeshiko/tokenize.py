@@ -7,10 +7,10 @@ from nadeshiko.token import TokenType, Token, new_token
 
 def get_punctuator_length(expression: str) -> int:
     if (
-            expression.startswith("==")
-            or expression.startswith("!=")
-            or expression.startswith("<=")
-            or expression.startswith(">=")
+        expression.startswith("==")
+        or expression.startswith("!=")
+        or expression.startswith("<=")
+        or expression.startswith(">=")
     ):
         return 2
     return 1 if expression[0] in string.printable else 0
@@ -48,8 +48,8 @@ def tokenize(expression: str) -> Optional[Token]:
             current.value = int("".join(temp))
             current.length = index - current.location
             current.expression = expression[
-                                 current.location: current.location + current.length
-                                 ]
+                current.location : current.location + current.length
+            ]
             current.original_expression = expression
             continue
         if expression[index].isalpha():
@@ -65,8 +65,8 @@ def tokenize(expression: str) -> Optional[Token]:
             current.next_token = new_token(TokenType.Punctuator, index, index + length)
             current = current.next_token
             current.expression = expression[
-                                 current.location: current.location + current.length
-                                 ]
+                current.location : current.location + current.length
+            ]
             current.original_expression = expression
             index += length
             continue
