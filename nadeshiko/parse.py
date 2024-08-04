@@ -26,6 +26,15 @@ def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[
         node = new_unary(NodeType.Return, node)
         token = skip(token, ";")
         return token, node
+    if equal(token, "if"):
+        node = new_node(NodeType.If)
+        token = skip(token.next_token, "(")
+        token, node.condition = expression_parse(token, local_objs)
+        token = skip(token, ")")
+        token, node.then = parse_stmt_return(token, local_objs)
+        if equal(token, "else"):
+            token, node.els = parse_stmt_return(token.next_token, local_objs)
+        return token, node
     if equal(token, "{"):
         return convert_compound_stmt(token.next_token, local_objs)
     return expression_parse_stmt(token, local_objs)
@@ -45,7 +54,7 @@ def expression_parse(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[O
 
 
 def convert_compound_stmt(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
-    head = Node(NodeType.Block, None, None, None, None, None, None)
+    head = new_node(NodeType.Block)
     current = head
     while not equal(token, "}"):
         token, node = parse_stmt_return(token, local_objs)

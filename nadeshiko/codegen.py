@@ -1,6 +1,12 @@
 from nadeshiko.node import Node, NodeType, Function
 
 
+def count() -> int:
+    i = 1
+    i += 1
+    return i
+
+
 def align_to(offset: int, align: int) -> int:
     return (offset + align - 1) // align * align
 
@@ -36,6 +42,22 @@ def codegen(prog: Function) -> str:
 def generate_stmt(node: Node, depth: int) -> (list[str], int):
     result = []
     match node.kind:
+        case NodeType.If:
+            c = count()
+            temp_data, depth = generate_asm(node.condition, depth)
+            result.extend(temp_data)
+            result.append(f"  cmp $0, %rax\n")
+            result.append(f"  je .L.else{c}\n")
+            temp_data, depth = generate_stmt(node.then, depth)
+            result.extend(temp_data)
+            result.append(f"  jmp .L.end{c}\n")
+            result.append(f".L.else{c}:\n")
+            if node.els:
+                temp_data, depth = generate_stmt(node.els, depth)
+                result.extend(temp_data)
+            result.append(f".L.end{c}:\n")
+            return result, depth
+
         case NodeType.ExpressionStmt:
             temp_data, depth = generate_asm(node.left, depth)
             result.extend(temp_data)

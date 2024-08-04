@@ -19,17 +19,21 @@ class NodeType(IntEnum):
     Variable = 13
     Return = 14
     Block = 15
+    If = 16
 
 
 @dataclass
 class Node:
-    kind: Optional[NodeType]
-    next_node: Optional["Node"]
-    left: Optional["Node"]
-    right: Optional["Node"]
-    value: Optional[int]
-    var: Optional["Obj"]
-    body: Optional["Node"]
+    kind: Optional[NodeType] = None
+    next_node: Optional["Node"] = None
+    left: Optional["Node"] = None
+    right: Optional["Node"] = None
+    value: Optional[int] = None
+    var: Optional["Obj"] = None
+    body: Optional["Node"] = None
+    condition: Optional["Node"] = None
+    then: Optional["Node"] = None
+    els: Optional["Node"] = None
 
 
 @dataclass
@@ -47,7 +51,8 @@ class Function:
 
 
 def new_node(kind: NodeType) -> Node:
-    return Node(kind, None, None, None, None, None, None)
+    node = Node(kind)
+    return node
 
 
 def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
@@ -58,15 +63,21 @@ def new_binary(kind: NodeType, left: Node, right: Node) -> Node:
 
 
 def new_number(value: int) -> Node:
-    return Node(NodeType.Number, None, None, None, value, None, None)
+    node = new_node(NodeType.Number)
+    node.value = value
+    return node
 
 
-def new_unary(node_type: NodeType, node: Node) -> Node:
-    return Node(node_type, None, node, None, None, None, None)
+def new_unary(node_type: NodeType, left_node: Node) -> Node:
+    node = new_node(node_type)
+    node.left = left_node
+    return node
 
 
 def new_var_node(obj: Obj) -> Node:
-    return Node(NodeType.Variable, None, None, None, None, obj, None)
+    node = new_node(NodeType.Variable)
+    node.var = obj
+    return node
 
 
 def new_lvar(name: str, next_obj: Obj) -> Obj:
