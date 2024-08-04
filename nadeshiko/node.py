@@ -23,6 +23,8 @@ class NodeType(IntEnum):
     Block = 15
     If = 16
     ForStmt = 17
+    Addr = 18
+    Deref = 19
 
 
 @dataclass

@@ -173,6 +173,14 @@ def convert_unary_token(
         token, node = convert_unary_token(token.next_token, local_objs)
         node = new_unary(NodeType.Neg, node, token)
         return token, node
+    if equal(token, "&"):
+        token, node = primary_token(token.next_token, local_objs)
+        node = new_unary(NodeType.Addr, node, token)
+        return token, node
+    if equal(token, "*"):
+        token, node = convert_unary_token(token.next_token, local_objs)
+        node = new_unary(NodeType.Deref, node, token)
+        return token, node
     return primary_token(token, local_objs)
 
 

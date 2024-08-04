@@ -96,8 +96,16 @@ def generate_stmt(node: Node, depth: int) -> (list[str], int):
     raise ValueError("invalid node type")
 
 
-def generate_address(node: Node) -> str:
-    return f"  lea {node.var.offset}(%rbp), %rax\n"
+def generate_address(node: Node, depth: int) -> (list[str], int):
+    result = []
+    if node.kind == NodeType.Variable:
+        result.append(f"  lea {node.var.offset}(%rbp), %rax\n")
+        return result, depth
+    if node.kind == NodeType.Deref:
+        temp_data, depth = generate_asm(node.left, depth)
+        result.extend(temp_data)
+        return result, depth
+    raise ValueError("invalid node type")
 
 
 def generate_asm(node: Node, depth: int) -> (list[str], int):
@@ -121,11 +129,22 @@ def generate_asm(node: Node, depth: int) -> (list[str], int):
             result.append(f"  neg %rax\n")
             return result, depth
         case NodeType.Variable:
-            result.append(generate_address(node))
+            temp_data, depth = generate_address(node, depth)
+            result.extend(temp_data)
+            result.append(f"  mov (%rax), %rax\n")
+            return result, depth
+        case NodeType.Addr:
+            temp_data, depth = generate_address(node.left, depth)
+            result.extend(temp_data)
+            return result, depth
+        case NodeType.Deref:
+            temp_data, depth = generate_asm(node.left, depth)
+            result.extend(temp_data)
             result.append(f"  mov (%rax), %rax\n")
             return result, depth
         case NodeType.Assign:
-            result.append(generate_address(node.left))
+            temp_data, depth = generate_address(node.left, depth)
+            result.extend(temp_data)
             temp_data, depth = push(depth)
             result.extend(temp_data)
             temp_data, depth = generate_asm(node.right, depth)
