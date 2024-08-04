@@ -17,6 +17,7 @@ class NodeType(IntEnum):
     ExpressionStmt = 11
     Assign = 12
     Variable = 13
+    Return = 14
 
 
 @dataclass

@@ -27,6 +27,7 @@ def codegen(prog: Function) -> str:
         assert depth == 0
         result.extend(temp)
         prog.body = prog.body.next_node
+    result.append(".L.return:\n")
     result.append("  mov %rbp, %rsp\n")
     result.append("  pop %rbp\n")
     result.append("  ret\n")
@@ -34,8 +35,17 @@ def codegen(prog: Function) -> str:
 
 
 def generate_stmt(node: Node, depth: int) -> (list[str], int):
-    if node.kind == NodeType.ExpressionStmt:
-        return generate_asm(node.left, depth)
+    result = []
+    match node.kind:
+        case NodeType.ExpressionStmt:
+            temp_data, depth = generate_asm(node.left, depth)
+            result.extend(temp_data)
+            return result, depth
+        case NodeType.Return:
+            temp_data, depth = generate_asm(node.left, depth)
+            result.extend(temp_data)
+            result.append("  jmp .L.return\n")
+            return result, depth
     raise ValueError("invalid node type")
 
 

@@ -17,11 +17,20 @@ def parse_stmt(token: Token) -> Optional["Function"]:
     current = head
     local_objs: list[Optional["Obj"]] = [None]
     while token.type != TokenType.EOF:
-        token, node = expression_parse_stmt(token, local_objs)
+        token, node = parse_stmt_return(token, local_objs)
         current.next_node = node
         current = node
     local_objs.pop(0)
     return Function(head.next_node, local_objs, 0)
+
+
+def parse_stmt_return(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
+    if equal(token, "return"):
+        token, node = expression_parse(token.next_token, local_objs)
+        node = new_unary(NodeType.Return, node)
+        token = skip(token, ";")
+        return token, node
+    return expression_parse_stmt(token, local_objs)
 
 
 def expression_parse_stmt(token: Token, local_objs: list[Optional["Obj"]]) -> tuple[Optional[Token], Optional[Node]]:
