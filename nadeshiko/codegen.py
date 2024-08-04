@@ -11,7 +11,7 @@ def align_to(offset: int, align: int) -> int:
     return (offset + align - 1) // align * align
 
 
-def assign_lvar_offsets(prog: Function) -> int:
+def assign_lvar_offsets(prog: Function) -> None:
     offset = 0
     for obj in prog.locals_obj[::-1]:
         offset += 8
@@ -28,10 +28,8 @@ def codegen(prog: Function) -> str:
         f"  mov %rsp, %rbp\n",
         f"  sub ${prog.stack_size}, %rsp\n",
     ]
-    temp, depth = generate_stmt(prog.body, 0)
+    depth = generate_stmt(result, prog.body, 0)
     assert depth == 0
-    result.extend(temp)
-
     result.append(".L.return:\n")
     result.append("  mov %rbp, %rsp\n")
     result.append("  pop %rbp\n")
@@ -39,153 +37,130 @@ def codegen(prog: Function) -> str:
     return "".join(result)
 
 
-def generate_stmt(node: Node, depth: int) -> (list[str], int):
-    result = []
+def generate_stmt(global_stmt: list[str], node: Node, depth: int) -> (list[str], int):
     match node.kind:
         case NodeType.If:
             c = count()
-            temp_data, depth = generate_asm(node.condition, depth)
-            result.extend(temp_data)
-            result.append(f"  cmp $0, %rax\n")
-            result.append(f"  je .L.else{c}\n")
-            temp_data, depth = generate_stmt(node.then, depth)
-            result.extend(temp_data)
-            result.append(f"  jmp .L.end{c}\n")
-            result.append(f".L.else{c}:\n")
+            depth = generate_asm(global_stmt, node.condition, depth)
+            global_stmt.append(f"  cmp $0, %rax\n")
+            global_stmt.append(f"  je .L.else{c}\n")
+            depth = generate_stmt(global_stmt, node.then, depth)
+
+            global_stmt.append(f"  jmp .L.end{c}\n")
+            global_stmt.append(f".L.else{c}:\n")
             if node.els:
-                temp_data, depth = generate_stmt(node.els, depth)
-                result.extend(temp_data)
-            result.append(f".L.end{c}:\n")
-            return result, depth
+                depth = generate_stmt(global_stmt, node.els, depth)
+            global_stmt.append(f".L.end{c}:\n")
+            return depth
         case NodeType.ForStmt:
             c = count()
             if node.init:
-                temp_data, depth = generate_stmt(node.init, depth)
-                result.extend(temp_data)
-            result.append(f".L.begin{c}:\n")
+                depth = generate_stmt(global_stmt, node.init, depth)
+            global_stmt.append(f".L.begin{c}:\n")
             if node.condition:
-                temp_data, depth = generate_asm(node.condition, depth)
-                result.extend(temp_data)
-                result.append(f"  cmp $0, %rax\n")
-                result.append(f"  je .L.end{c}\n")
-            temp_data, depth = generate_stmt(node.then, depth)
-            result.extend(temp_data)
+                depth = generate_asm(global_stmt, node.condition, depth)
+                global_stmt.append(f"  cmp $0, %rax\n")
+                global_stmt.append(f"  je .L.end{c}\n")
+            depth = generate_stmt(global_stmt, node.then, depth)
             if node.inc:
-                temp_data, depth = generate_asm(node.inc, depth)
-                result.extend(temp_data)
-            result.append(f"  jmp .L.begin{c}\n")
-            result.append(f".L.end{c}:\n")
-            return result, depth
-
+                depth = generate_asm(global_stmt, node.inc, depth)
+            global_stmt.append(f"  jmp .L.begin{c}\n")
+            global_stmt.append(f".L.end{c}:\n")
+            return depth
         case NodeType.ExpressionStmt:
-            temp_data, depth = generate_asm(node.left, depth)
-            result.extend(temp_data)
-            return result, depth
+            depth = generate_asm(global_stmt, node.left, depth)
+            return depth
         case NodeType.Return:
-            temp_data, depth = generate_asm(node.left, depth)
-            result.extend(temp_data)
-            result.append("  jmp .L.return\n")
-            return result, depth
+            depth = generate_asm(global_stmt, node.left, depth)
+
+            global_stmt.append("  jmp .L.return\n")
+            return depth
         case NodeType.Block:
             node = node.body
             while node:
-                temp_data, depth = generate_stmt(node, depth)
-                result.extend(temp_data)
+                depth = generate_stmt(global_stmt, node, depth)
                 node = node.next_node
-            return result, depth
+            return depth
     raise ValueError("invalid node type")
 
 
-def generate_address(node: Node, depth: int) -> (list[str], int):
-    result = []
+def generate_address(global_stmt: list[str], node: Node, depth: int) -> int:
     if node.kind == NodeType.Variable:
-        result.append(f"  lea {node.var.offset}(%rbp), %rax\n")
-        return result, depth
+        global_stmt.append(f"  lea {node.var.offset}(%rbp), %rax\n")
+        return depth
     if node.kind == NodeType.Deref:
-        temp_data, depth = generate_asm(node.left, depth)
-        result.extend(temp_data)
-        return result, depth
+        depth = generate_asm(global_stmt, node.left, depth)
+        return depth
     raise ValueError("invalid node type")
 
 
-def generate_asm(node: Node, depth: int) -> (list[str], int):
-    result = []
+def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
     if not node:
-        return result, depth
+        return depth
 
     def push(depth: int) -> (list[str], depth):
-        return ["  push %rax\n"], depth + 1
+        global_stmt.append("  push %rax\n")
+        return depth + 1
 
     def pop(register: str, depth: int) -> (list[str], depth):
-        return [f"  pop %{register}\n"], depth - 1
+        global_stmt.append(f"  pop %{register}\n")
+        return depth - 1
 
     match node.kind:
         case NodeType.Number:
-            result.append(f"  mov ${node.value}, %rax\n")
-            return result, depth
+            global_stmt.append(f"  mov ${node.value}, %rax\n")
+            return depth
         case NodeType.Neg:
-            temp_data, depth = generate_asm(node.left, depth)
-            result.extend(temp_data)
-            result.append(f"  neg %rax\n")
-            return result, depth
+            depth = generate_asm(global_stmt, node.left, depth)
+            global_stmt.append(f"  neg %rax\n")
+            return depth
         case NodeType.Variable:
-            temp_data, depth = generate_address(node, depth)
-            result.extend(temp_data)
-            result.append(f"  mov (%rax), %rax\n")
-            return result, depth
+            depth = generate_address(global_stmt, node, depth)
+            global_stmt.append(f"  mov (%rax), %rax\n")
+            return depth
         case NodeType.Addr:
-            temp_data, depth = generate_address(node.left, depth)
-            result.extend(temp_data)
-            return result, depth
+            depth = generate_address(global_stmt, node.left, depth)
+            return depth
         case NodeType.Deref:
-            temp_data, depth = generate_asm(node.left, depth)
-            result.extend(temp_data)
-            result.append(f"  mov (%rax), %rax\n")
-            return result, depth
+            depth = generate_asm(global_stmt, node.left, depth)
+            global_stmt.append(f"  mov (%rax), %rax\n")
+            return depth
         case NodeType.Assign:
-            temp_data, depth = generate_address(node.left, depth)
-            result.extend(temp_data)
-            temp_data, depth = push(depth)
-            result.extend(temp_data)
-            temp_data, depth = generate_asm(node.right, depth)
-            result.extend(temp_data)
-            temp_data, depth = pop("rdi", depth)
-            result.extend(temp_data)
-            result.append("  mov %rax, (%rdi)\n")
-            return result, depth
-    temp_data, depth = generate_asm(node.right, depth)
-    result.extend(temp_data)
-    temp_data, depth = push(depth)
-    result.extend(temp_data)
-    temp_data, depth = generate_asm(node.left, depth)
-    result.extend(temp_data)
-    temp_data, depth = pop("rdi", depth)
-    result.extend(temp_data)
+            depth = generate_address(global_stmt, node.left, depth)
+            depth = push(depth)
+            depth = generate_asm(global_stmt, node.right, depth)
+            depth = pop("rdi", depth)
+            global_stmt.append("  mov %rax, (%rdi)\n")
+            return depth
+    depth = generate_asm(global_stmt, node.right, depth)
+    depth = push(depth)
+    depth = generate_asm(global_stmt, node.left, depth)
+    depth = pop("rdi", depth)
     match node.kind:
         case NodeType.Add:
-            result.append(f"  add %rdi, %rax\n")
-            return result, depth
+            global_stmt.append(f"  add %rdi, %rax\n")
+            return depth
         case NodeType.Sub:
-            result.append(f"  sub %rdi, %rax\n")
-            return result, depth
+            global_stmt.append(f"  sub %rdi, %rax\n")
+            return depth
         case NodeType.Mul:
-            result.append(f"  imul %rdi, %rax\n")
-            return result, depth
+            global_stmt.append(f"  imul %rdi, %rax\n")
+            return depth
         case NodeType.Div:
-            result.append(f"  cqo\n")
-            result.append(f"  div %rdi, %rax\n")
-            return result, depth
+            global_stmt.append(f"  cqo\n")
+            global_stmt.append(f"  div %rdi, %rax\n")
+            return depth
         case NodeType.Equal | NodeType.NotEqual | NodeType.Less | NodeType.LessEqual:
-            result.append(f"  cmp %rdi, %rax\n")
+            global_stmt.append(f"  cmp %rdi, %rax\n")
             match node.kind:
                 case NodeType.Equal:
-                    result.append("  sete %al\n")
+                    global_stmt.append("  sete %al\n")
                 case NodeType.NotEqual:
-                    result.append("  setne %al\n")
+                    global_stmt.append("  setne %al\n")
                 case NodeType.Less:
-                    result.append("  setl %al\n")
+                    global_stmt.append("  setl %al\n")
                 case NodeType.LessEqual:
-                    result.append("  setle %al\n")
-            result.append("  movzb %al, %rax\n")
-            return result, depth
+                    global_stmt.append("  setle %al\n")
+            global_stmt.append("  movzb %al, %rax\n")
+            return depth
     raise ValueError("invalid node type")
