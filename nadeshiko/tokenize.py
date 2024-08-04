@@ -7,13 +7,27 @@ from nadeshiko.token import TokenType, Token, new_token
 
 def get_punctuator_length(expression: str) -> int:
     if (
-        expression.startswith("==")
-        or expression.startswith("!=")
-        or expression.startswith("<=")
-        or expression.startswith(">=")
+            expression.startswith("==")
+            or expression.startswith("!=")
+            or expression.startswith("<=")
+            or expression.startswith(">=")
     ):
         return 2
     return 1 if expression[0] in string.printable else 0
+
+
+def is_keyword(token: Token) -> bool:
+    keywords = {"return", "if", "else", "while", "for"}
+    if token.expression in keywords:
+        return True
+    return False
+
+
+def convert_keyword(token: Token) -> None:
+    while token:
+        if is_keyword(token):
+            token.type = TokenType.Keyword
+        token = token.next_token
 
 
 def tokenize(expression: str) -> Optional[Token]:
@@ -34,8 +48,8 @@ def tokenize(expression: str) -> Optional[Token]:
             current.value = int("".join(temp))
             current.length = index - current.location
             current.expression = expression[
-                current.location : current.location + current.length
-            ]
+                                 current.location: current.location + current.length
+                                 ]
             current.original_expression = expression
             continue
         if expression[index].isalpha():
@@ -51,12 +65,13 @@ def tokenize(expression: str) -> Optional[Token]:
             current.next_token = new_token(TokenType.Punctuator, index, index + length)
             current = current.next_token
             current.expression = expression[
-                current.location : current.location + current.length
-            ]
+                                 current.location: current.location + current.length
+                                 ]
             current.original_expression = expression
             index += length
             continue
         print(error_message(expression, index, "invalid token"))
         exit(1)
     current.next_token = new_token(TokenType.EOF, index, index)
+    convert_keyword(head.next_token)
     return head.next_token

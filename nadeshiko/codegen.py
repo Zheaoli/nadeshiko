@@ -59,8 +59,9 @@ def generate_stmt(node: Node, depth: int) -> (list[str], int):
             return result, depth
         case NodeType.ForStmt:
             c = count()
-            temp_data, depth = generate_stmt(node.init, depth)
-            result.extend(temp_data)
+            if node.init:
+                temp_data, depth = generate_stmt(node.init, depth)
+                result.extend(temp_data)
             result.append(f".L.begin{c}:\n")
             if node.condition:
                 temp_data, depth = generate_asm(node.condition, depth)

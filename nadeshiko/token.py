@@ -10,6 +10,7 @@ class TokenType(IntEnum):
     Number = 2
     EOF = 3
     Identifier = 4
+    Keyword = 5
 
 
 @dataclass
@@ -24,7 +25,7 @@ class Token:
 
 
 def new_token(
-    token_type: Optional[TokenType] = None, start: int = 0, end: int = 0
+        token_type: Optional[TokenType] = None, start: int = 0, end: int = 0
 ) -> Token:
     return Token(token_type, None, None, start, end - start, None, None)
 
