@@ -16,7 +16,6 @@ class TokenType(IntEnum):
 @dataclass
 class Token:
     type: Optional[TokenType] = None
-    next_token: Optional["Token"] = None
     value: Optional[int] = None
     location: Optional[int] = None
     length: Optional[int] = None
@@ -27,7 +26,7 @@ class Token:
 def new_token(
     token_type: Optional[TokenType] = None, start: int = 0, end: int = 0
 ) -> Token:
-    return Token(token_type, None, None, start, end - start, None, None)
+    return Token(token_type, None, start, end - start, None, None)
 
 
 def get_number(token: Token) -> int:
@@ -43,6 +42,5 @@ def equal(token: Token, expression: str) -> bool:
     return token.expression == expression
 
 
-def skip(token: Token, expression: str) -> Token:
+def skip(token: Token, expression: str) -> None:
     assert token.expression == expression
-    return token.next_token
