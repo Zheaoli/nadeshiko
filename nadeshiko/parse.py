@@ -4,7 +4,7 @@ from nadeshiko.helper import error_message
 from nadeshiko.node import (
     Node,
     new_binary,
-    NodeType,
+    NodeKind,
     new_unary,
     new_number,
     new_var_node,
@@ -12,8 +12,10 @@ from nadeshiko.node import (
     new_lvar,
     Function,
     new_node,
+    add_type,
 )
 from nadeshiko.token import TokenType, equal, skip, Token
+from nadeshiko.type import is_integer, TYPE_INT
 from nadeshiko.utils import Peekable
 
 
@@ -35,11 +37,11 @@ class Parse:
         if equal(token, "return"):
             next(self.tokens)
             node = self.expression_parse(local_objs)
-            node = new_unary(NodeType.Return, node, token)
+            node = new_unary(NodeKind.Return, node, token)
             skip(next(self.tokens), ";")
             return node
         if equal(token, "if"):
-            node = new_node(NodeType.If, token)
+            node = new_node(NodeKind.If, token)
             next(self.tokens)
             skip(next(self.tokens), "(")
             node.condition = self.expression_parse(local_objs)
@@ -50,7 +52,7 @@ class Parse:
                 node.els = self.parse_stmt_return(local_objs)
             return node
         if equal(token, "while"):
-            node = new_node(NodeType.ForStmt, token)
+            node = new_node(NodeKind.ForStmt, token)
             next(self.tokens)
             skip(next(self.tokens), "(")
             node.condition = self.expression_parse(local_objs)
@@ -58,7 +60,7 @@ class Parse:
             node.then = self.parse_stmt_return(local_objs)
             return node
         if equal(token, "for"):
-            node = new_node(NodeType.ForStmt, token)
+            node = new_node(NodeKind.ForStmt, token)
             next(self.tokens)
             skip(next(self.tokens), "(")
             node.init = self.expression_parse_stmt(local_objs)
@@ -82,9 +84,9 @@ class Parse:
         token = self.tokens.peek()
         if equal(token, ";"):
             next(self.tokens)
-            return new_node(NodeType.Block, token)
+            return new_node(NodeKind.Block, token)
         node = self.expression_parse(local_objs)
-        node = new_unary(NodeType.ExpressionStmt, node, token)
+        node = new_unary(NodeKind.ExpressionStmt, node, token)
         skip(next(self.tokens), ";")
         return node
 
@@ -94,13 +96,13 @@ class Parse:
     def convert_compound_stmt(
         self, local_objs: list[Optional["Obj"]]
     ) -> Optional[Node]:
-        head = new_node(NodeType.Block, self.tokens.peek())
+        head = new_node(NodeKind.Block, self.tokens.peek())
         current = head
         while not equal(self.tokens.peek(), "}"):
             node = self.parse_stmt_return(local_objs)
             current.next_node = node
             current = node
-        node = new_node(NodeType.Block, self.tokens.peek())
+        node = new_node(NodeKind.Block, self.tokens.peek())
         node.body = head.next_node
         next(self.tokens)
         return node
@@ -116,14 +118,14 @@ class Parse:
                 next_node = self.convert_add_token(local_objs)
                 left_node = node if equal(token, "<") else next_node
                 right_node = next_node if equal(token, "<") else node
-                node = new_binary(NodeType.Less, left_node, right_node, token)
+                node = new_binary(NodeKind.Less, left_node, right_node, token)
                 continue
             if equal(token, "<=") or equal(token, ">="):
                 next(self.tokens)
                 next_node = self.convert_add_token(local_objs)
                 left_node = node if equal(token, "<=") else next_node
                 right_node = next_node if equal(token, "<=") else node
-                node = new_binary(NodeType.LessEqual, left_node, right_node, token)
+                node = new_binary(NodeKind.LessEqual, left_node, right_node, token)
                 continue
             return node
 
@@ -132,7 +134,7 @@ class Parse:
         if equal(self.tokens.peek(), "="):
             token = next(self.tokens)
             next_node = self.convert_assign_token(local_objs)
-            node = new_binary(NodeType.Assign, node, next_node, token)
+            node = new_binary(NodeKind.Assign, node, next_node, token)
         return node
 
     def convert_equality_token(
@@ -144,12 +146,12 @@ class Parse:
             if equal(token, "=="):
                 next(self.tokens)
                 next_node = self.convert_relational_token(local_objs)
-                node = new_binary(NodeType.Equal, node, next_node, token)
+                node = new_binary(NodeKind.Equal, node, next_node, token)
                 continue
             if equal(token, "!="):
                 next(self.tokens)
                 next_node = self.convert_relational_token(local_objs)
-                node = new_binary(NodeType.NotEqual, node, next_node, token)
+                node = new_binary(NodeKind.NotEqual, node, next_node, token)
                 continue
             return node
 
@@ -160,12 +162,12 @@ class Parse:
             if equal(token, "+"):
                 next(self.tokens)
                 next_node = self.convert_mul_token(local_objs)
-                node = new_binary(NodeType.Add, node, next_node, token)
+                node = self.new_add(node, next_node, token)
                 continue
             if equal(token, "-"):
                 next(self.tokens)
                 next_node = self.convert_mul_token(local_objs)
-                node = new_binary(NodeType.Sub, node, next_node, token)
+                node = self.new_sub(node, next_node, token)
                 continue
             return node
 
@@ -177,17 +179,17 @@ class Parse:
         if equal(token, "-"):
             next(self.tokens)
             node = self.convert_unary_token(local_objs)
-            node = new_unary(NodeType.Neg, node, token)
+            node = new_unary(NodeKind.Neg, node, token)
             return node
         if equal(token, "&"):
             next(self.tokens)
             node = self.primary_token(local_objs)
-            node = new_unary(NodeType.Addr, node, token)
+            node = new_unary(NodeKind.Addr, node, token)
             return node
         if equal(token, "*"):
             next(self.tokens)
             node = self.convert_unary_token(local_objs)
-            node = new_unary(NodeType.Deref, node, token)
+            node = new_unary(NodeKind.Deref, node, token)
             return node
         return self.primary_token(local_objs)
 
@@ -198,12 +200,12 @@ class Parse:
             if equal(token, "*"):
                 next(self.tokens)
                 next_node = self.primary_token(local_objs)
-                node = new_binary(NodeType.Mul, node, next_node, token)
+                node = new_binary(NodeKind.Mul, node, next_node, token)
                 continue
             if equal(token, "/"):
                 next(self.tokens)
                 next_node = self.primary_token(local_objs)
-                node = new_binary(NodeType.Div, node, next_node, token)
+                node = new_binary(NodeKind.Div, node, next_node, token)
                 continue
             return node
 
@@ -226,6 +228,47 @@ class Parse:
             return new_var_node(obj, token)
         print(error_message(token.expression, token.location, "expected an expression"))
         exit(1)
+
+    def new_add(self, left: Node, right: Node, token: Token) -> Node:
+        add_type(left)
+        add_type(right)
+        if is_integer(left.node_type) and is_integer(right.node_type):
+            return new_binary(NodeKind.Add, left, right, token)
+        if left.node_type.base and right.node_type.base:
+            raise ValueError("pointer + pointer")
+        if not left.node_type.base and not right.node_type.base:
+            left, right = right, left
+        right = new_binary(
+            NodeKind.Mul, right, new_number(8, token), self.tokens.peek()
+        )
+        return new_binary(NodeKind.Add, left, right, token)
+
+    def new_sub(self, left: Node, right: Node, token: Token) -> Node:
+        add_type(left)
+        add_type(right)
+        if is_integer(left.node_type) and is_integer(right.node_type):
+            return new_binary(NodeKind.Sub, left, right, token)
+        if left.node_type.base and is_integer(right.node_type):
+            right = new_binary(
+                NodeKind.Mul,
+                right,
+                new_number(8, self.tokens.peek()),
+                self.tokens.peek(),
+            )
+            add_type(right)
+            node = new_binary(NodeKind.Sub, left, right, token)
+            node.node_type = left.node_type
+            return node
+        if left.node_type.base and right.node_type.base:
+            node = new_binary(NodeKind.Sub, left, right, token)
+            node.node_type = TYPE_INT
+            return new_binary(
+                NodeKind.Div,
+                node,
+                new_number(8, self.tokens.peek()),
+                self.tokens.peek(),
+            )
+        raise ValueError("pointer - pointer")
 
 
 def search_obj(obj: str, local_objs: list[Optional["Obj"]]) -> Optional[Obj]:

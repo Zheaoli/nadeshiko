@@ -3,9 +3,10 @@ from enum import IntEnum
 from typing import Optional
 
 from nadeshiko.token import Token
+from nadeshiko.type import pointer_to, TYPE_INT, Type, TypeKind
 
 
-class NodeType(IntEnum):
+class NodeKind(IntEnum):
     Add = 1
     Sub = 2
     Mul = 3
@@ -29,7 +30,7 @@ class NodeType(IntEnum):
 
 @dataclass
 class Node:
-    kind: Optional[NodeType] = None
+    kind: Optional[NodeKind] = None
     next_node: Optional["Node"] = None
     left: Optional["Node"] = None
     right: Optional["Node"] = None
@@ -42,6 +43,7 @@ class Node:
     init: Optional["Node"] = None
     inc: Optional["Node"] = None
     token: Optional["Token"] = None
+    node_type: Optional["Type"] = None
 
 
 @dataclass
@@ -58,13 +60,13 @@ class Function:
     stack_size: Optional[int]
 
 
-def new_node(kind: NodeType, token: Token) -> Node:
+def new_node(kind: NodeKind, token: Token) -> Node:
     node = Node(kind)
     node.token = token
     return node
 
 
-def new_binary(kind: NodeType, left: Node, right: Node, token: Token) -> Node:
+def new_binary(kind: NodeKind, left: Node, right: Node, token: Token) -> Node:
     node = new_node(kind, token)
     node.left = left
     node.right = right
@@ -72,22 +74,68 @@ def new_binary(kind: NodeType, left: Node, right: Node, token: Token) -> Node:
 
 
 def new_number(value: int, token: Token) -> Node:
-    node = new_node(NodeType.Number, token)
+    node = new_node(NodeKind.Number, token)
     node.value = value
     return node
 
 
-def new_unary(node_type: NodeType, left_node: Node, token: Token) -> Node:
+def new_unary(node_type: NodeKind, left_node: Node, token: Token) -> Node:
     node = new_node(node_type, token)
     node.left = left_node
     return node
 
 
 def new_var_node(obj: Obj, token: Token) -> Node:
-    node = new_node(NodeType.Variable, token)
+    node = new_node(NodeKind.Variable, token)
     node.var = obj
     return node
 
 
 def new_lvar(name: str, next_obj: Obj) -> Obj:
     return Obj(next_obj, name, 0)
+
+
+def add_type(node: Node) -> None:
+    if not node or node.node_type:
+        return
+    add_type(node.left)
+    add_type(node.right)
+    add_type(node.condition)
+    add_type(node.then)
+    add_type(node.els)
+    add_type(node.init)
+    add_type(node.inc)
+    current = node.body
+    while current:
+        add_type(current)
+        current = current.next_node
+    match node.kind:
+        case (
+            NodeKind.Add
+            | NodeKind.Sub
+            | NodeKind.Mul
+            | NodeKind.Div
+            | NodeKind.Neg
+            | NodeKind.Assign
+        ):
+            node.node_type = node.left.node_type
+            return
+        case (
+            NodeKind.Equal
+            | NodeKind.NotEqual
+            | NodeKind.Less
+            | NodeKind.LessEqual
+            | NodeKind.Variable
+            | NodeKind.Number
+        ):
+            node.node_type = TYPE_INT
+            return
+        case NodeKind.Addr:
+            node.node_type = pointer_to(node.left.node_type)
+            return
+        case NodeKind.Deref:
+            if node.left.node_type.kind == TypeKind.TYPE_PTR:
+                node.node_type = node.left.node_type.base
+            else:
+                node.node_type = TYPE_INT
+            return

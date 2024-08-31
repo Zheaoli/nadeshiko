@@ -1,4 +1,4 @@
-from nadeshiko.node import Node, NodeType, Function
+from nadeshiko.node import Node, NodeKind, Function
 
 
 def count() -> int:
@@ -39,7 +39,7 @@ def codegen(prog: Function) -> str:
 
 def generate_stmt(global_stmt: list[str], node: Node, depth: int) -> (list[str], int):
     match node.kind:
-        case NodeType.If:
+        case NodeKind.If:
             c = count()
             depth = generate_asm(global_stmt, node.condition, depth)
             global_stmt.append(f"  cmp $0, %rax\n")
@@ -52,7 +52,7 @@ def generate_stmt(global_stmt: list[str], node: Node, depth: int) -> (list[str],
                 depth = generate_stmt(global_stmt, node.els, depth)
             global_stmt.append(f".L.end{c}:\n")
             return depth
-        case NodeType.ForStmt:
+        case NodeKind.ForStmt:
             c = count()
             if node.init:
                 depth = generate_stmt(global_stmt, node.init, depth)
@@ -67,15 +67,15 @@ def generate_stmt(global_stmt: list[str], node: Node, depth: int) -> (list[str],
             global_stmt.append(f"  jmp .L.begin{c}\n")
             global_stmt.append(f".L.end{c}:\n")
             return depth
-        case NodeType.ExpressionStmt:
+        case NodeKind.ExpressionStmt:
             depth = generate_asm(global_stmt, node.left, depth)
             return depth
-        case NodeType.Return:
+        case NodeKind.Return:
             depth = generate_asm(global_stmt, node.left, depth)
 
             global_stmt.append("  jmp .L.return\n")
             return depth
-        case NodeType.Block:
+        case NodeKind.Block:
             node = node.body
             while node:
                 depth = generate_stmt(global_stmt, node, depth)
@@ -85,10 +85,10 @@ def generate_stmt(global_stmt: list[str], node: Node, depth: int) -> (list[str],
 
 
 def generate_address(global_stmt: list[str], node: Node, depth: int) -> int:
-    if node.kind == NodeType.Variable:
+    if node.kind == NodeKind.Variable:
         global_stmt.append(f"  lea {node.var.offset}(%rbp), %rax\n")
         return depth
-    if node.kind == NodeType.Deref:
+    if node.kind == NodeKind.Deref:
         depth = generate_asm(global_stmt, node.left, depth)
         return depth
     raise ValueError("invalid node type")
@@ -107,25 +107,25 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
         return depth - 1
 
     match node.kind:
-        case NodeType.Number:
+        case NodeKind.Number:
             global_stmt.append(f"  mov ${node.value}, %rax\n")
             return depth
-        case NodeType.Neg:
+        case NodeKind.Neg:
             depth = generate_asm(global_stmt, node.left, depth)
             global_stmt.append(f"  neg %rax\n")
             return depth
-        case NodeType.Variable:
+        case NodeKind.Variable:
             depth = generate_address(global_stmt, node, depth)
             global_stmt.append(f"  mov (%rax), %rax\n")
             return depth
-        case NodeType.Addr:
+        case NodeKind.Addr:
             depth = generate_address(global_stmt, node.left, depth)
             return depth
-        case NodeType.Deref:
+        case NodeKind.Deref:
             depth = generate_asm(global_stmt, node.left, depth)
             global_stmt.append(f"  mov (%rax), %rax\n")
             return depth
-        case NodeType.Assign:
+        case NodeKind.Assign:
             depth = generate_address(global_stmt, node.left, depth)
             depth = push(depth)
             depth = generate_asm(global_stmt, node.right, depth)
@@ -137,29 +137,29 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
     depth = generate_asm(global_stmt, node.left, depth)
     depth = pop("rdi", depth)
     match node.kind:
-        case NodeType.Add:
+        case NodeKind.Add:
             global_stmt.append(f"  add %rdi, %rax\n")
             return depth
-        case NodeType.Sub:
+        case NodeKind.Sub:
             global_stmt.append(f"  sub %rdi, %rax\n")
             return depth
-        case NodeType.Mul:
+        case NodeKind.Mul:
             global_stmt.append(f"  imul %rdi, %rax\n")
             return depth
-        case NodeType.Div:
+        case NodeKind.Div:
             global_stmt.append(f"  cqo\n")
             global_stmt.append(f"  div %rdi, %rax\n")
             return depth
-        case NodeType.Equal | NodeType.NotEqual | NodeType.Less | NodeType.LessEqual:
+        case NodeKind.Equal | NodeKind.NotEqual | NodeKind.Less | NodeKind.LessEqual:
             global_stmt.append(f"  cmp %rdi, %rax\n")
             match node.kind:
-                case NodeType.Equal:
+                case NodeKind.Equal:
                     global_stmt.append("  sete %al\n")
-                case NodeType.NotEqual:
+                case NodeKind.NotEqual:
                     global_stmt.append("  setne %al\n")
-                case NodeType.Less:
+                case NodeKind.Less:
                     global_stmt.append("  setl %al\n")
-                case NodeType.LessEqual:
+                case NodeKind.LessEqual:
                     global_stmt.append("  setle %al\n")
             global_stmt.append("  movzb %al, %rax\n")
             return depth
