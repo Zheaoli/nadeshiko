@@ -1,4 +1,7 @@
 from typing import Optional
+from unittest.mock import right
+
+from jupyterlab.galata import configure_jupyter_server
 
 from nadeshiko.helper import error_message
 from nadeshiko.node import (
@@ -15,7 +18,8 @@ from nadeshiko.node import (
     add_type,
 )
 from nadeshiko.token import TokenType, equal, skip, Token
-from nadeshiko.type import is_integer, TYPE_INT
+from nadeshiko.tokenize import consume
+from nadeshiko.type import is_integer, TYPE_INT, pointer_to
 from nadeshiko.utils import Peekable
 
 
@@ -96,7 +100,10 @@ class Parse:
         head = new_node(NodeKind.Block, self.tokens.peek())
         current = head
         while not equal(self.tokens.peek(), "}"):
-            node = self.parse_stmt_return()
+            if equal(self.tokens.peek(), "int"):
+                node = self.declaration()
+            else:
+                node = self.parse_stmt_return()
             current.next_node = node
             current = node
         node = new_node(NodeKind.Block, self.tokens.peek())
@@ -216,8 +223,12 @@ class Parse:
             next(self.tokens)
             obj = search_obj(token.expression, self.local_objs)
             if not obj:
-                obj = new_lvar(token.expression, self.local_objs[-1])
-                self.local_objs.append(obj)
+                print(
+                    error_message(
+                        token.expression, token.location, "undefined variable"
+                    )
+                )
+                exit(1)
             return new_var_node(obj, token)
         print(error_message(token.expression, token.location, "expected an expression"))
         exit(1)
@@ -262,6 +273,70 @@ class Parse:
                 self.tokens.peek(),
             )
         raise ValueError("pointer - pointer")
+
+    def get_indet(self, token: Token) -> str:
+        if token.type != TokenType.Identifier:
+            print(
+                error_message(
+                    token.original_expression, token.location, "expected identifier"
+                )
+            )
+            exit(1)
+        return token.expression
+
+    def declspac(self) -> Optional["Type"]:
+        token = self.tokens.peek()
+        if equal(token, "int"):
+            next(self.tokens)
+            return TYPE_INT
+        print(error_message(token.expression, token.location, "expected type"))
+        exit(1)
+
+    def declarator(self, obj_type: Optional["Type"]) -> Optional["Type"]:
+        while consume(self.tokens, "*"):
+            obj_type = pointer_to(obj_type)
+        if self.tokens.peek().type != TokenType.Identifier:
+            print(
+                error_message(
+                    self.tokens.peek().original_expression,
+                    self.tokens.peek().location,
+                    "expected identifier",
+                )
+            )
+            exit(1)
+        obj_type.name = self.tokens.peek().expression
+        next(self.tokens)
+        return obj_type
+
+    def declaration(self) -> Optional["Node"]:
+        base_type = self.declspac()
+        head = Node(NodeKind.Block)
+        current = head
+        i = 0
+        while not equal(self.tokens.peek(), ";"):
+            i += 1
+            if i > 1:
+                skip(next(self.tokens), ",")
+            obj_type = self.declarator(base_type)
+            obj = new_lvar(
+                obj_type.name, self.local_objs[-1], obj_type, self.local_objs
+            )
+            if not equal(self.tokens.peek(), "="):
+                continue
+            left_node = new_var_node(obj, self.tokens.peek())
+            next(self.tokens)
+            right_node = self.convert_assign_token()
+            node = new_binary(
+                NodeKind.Assign, left_node, right_node, self.tokens.peek()
+            )
+            current.next_node = new_unary(
+                NodeKind.ExpressionStmt, node, self.tokens.peek()
+            )
+            current = current.next_node
+        node = new_node(NodeKind.Block, self.tokens.peek())
+        node.body = head.next_node
+        next(self.tokens)
+        return node
 
 
 def search_obj(obj: str, local_objs: list["Obj"]) -> Optional[Obj]:

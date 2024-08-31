@@ -48,9 +48,10 @@ class Node:
 
 @dataclass
 class Obj:
-    next_obj: Optional["Obj"]
-    name: Optional[str]
-    offset: Optional[int]
+    next_obj: Optional["Obj"] = None
+    name: Optional[str] = None
+    offset: Optional[int] = None
+    object_type: Optional["Type"] = None
 
 
 @dataclass
@@ -91,8 +92,12 @@ def new_var_node(obj: Obj, token: Token) -> Node:
     return node
 
 
-def new_lvar(name: str, next_obj: Obj) -> Obj:
-    return Obj(next_obj, name, 0)
+def new_lvar(
+    name: str, next_obj: Obj, object_type: Optional["Type"], objs: list["Obj"]
+) -> Obj:
+    obj = Obj(next_obj, name, 0, object_type)
+    objs.append(obj)
+    return obj
 
 
 def add_type(node: Node) -> None:
@@ -125,17 +130,18 @@ def add_type(node: Node) -> None:
             | NodeKind.NotEqual
             | NodeKind.Less
             | NodeKind.LessEqual
-            | NodeKind.Variable
             | NodeKind.Number
         ):
             node.node_type = TYPE_INT
+            return
+        case NodeKind.Variable:
+            node.node_type = node.var.object_type
             return
         case NodeKind.Addr:
             node.node_type = pointer_to(node.left.node_type)
             return
         case NodeKind.Deref:
             if node.left.node_type.kind == TypeKind.TYPE_PTR:
-                node.node_type = node.left.node_type.base
-            else:
-                node.node_type = TYPE_INT
+                raise ValueError("invalid pointer dereference")
+            node.node_type = node.left.node_type.base
             return

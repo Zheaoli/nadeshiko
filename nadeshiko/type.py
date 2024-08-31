@@ -12,6 +12,7 @@ class TypeKind(IntEnum):
 class Type:
     kind: TypeKind = None
     base: Optional["Type"] = None
+    name: Optional[str] = None
 
 
 TYPE_INT = Type(TypeKind.TYPE_INT)

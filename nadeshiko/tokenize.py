@@ -3,7 +3,7 @@ from typing import Optional
 
 
 from nadeshiko.helper import error_message
-from nadeshiko.token import TokenType, Token, new_token
+from nadeshiko.token import TokenType, Token, new_token, equal
 from nadeshiko.utils import Peekable
 
 
@@ -19,7 +19,7 @@ def get_punctuator_length(expression: str) -> int:
 
 
 def is_keyword(token: Token) -> bool:
-    keywords = {"return", "if", "else", "while", "for"}
+    keywords = {"return", "if", "else", "while", "for", "int"}
     if token.expression in keywords:
         return True
     return False
@@ -75,3 +75,10 @@ def tokenize(expression: str) -> Peekable[Optional[Token]]:
     tokens.append(new_token(TokenType.EOF, index, index))
     convert_keyword(tokens)
     return Peekable(tokens)
+
+
+def consume(tokens: Peekable[Optional[Token]], expression: str) -> bool:
+    if equal(tokens.peek(), expression):
+        next(tokens)
+        return True
+    return False
