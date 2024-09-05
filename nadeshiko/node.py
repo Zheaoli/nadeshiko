@@ -26,6 +26,7 @@ class NodeKind(IntEnum):
     ForStmt = 17
     Addr = 18
     Deref = 19
+    FunctionCall = 20
 
 
 @dataclass
@@ -44,6 +45,7 @@ class Node:
     inc: Optional["Node"] = None
     token: Optional["Token"] = None
     node_type: Optional["Type"] = None
+    function_name: Optional[str] = None
 
 
 @dataclass
@@ -131,6 +133,7 @@ def add_type(node: Node) -> None:
             | NodeKind.Less
             | NodeKind.LessEqual
             | NodeKind.Number
+            | NodeKind.FunctionCall
         ):
             node.node_type = TYPE_INT
             return

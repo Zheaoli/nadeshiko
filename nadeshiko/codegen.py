@@ -132,6 +132,10 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
             depth = pop("rdi", depth)
             global_stmt.append("  mov %rax, (%rdi)\n")
             return depth
+        case NodeKind.FunctionCall:
+            global_stmt.append("  mov $0, %rax\n")
+            global_stmt.append(f"  call {node.function_name}\n")
+            return depth
     depth = generate_asm(global_stmt, node.right, depth)
     depth = push(depth)
     depth = generate_asm(global_stmt, node.left, depth)

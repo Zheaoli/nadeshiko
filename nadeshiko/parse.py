@@ -19,7 +19,7 @@ from nadeshiko.node import (
 )
 from nadeshiko.token import TokenType, equal, skip, Token
 from nadeshiko.tokenize import consume
-from nadeshiko.type import is_integer, TYPE_INT, pointer_to
+from nadeshiko.type import is_integer, TYPE_INT, pointer_to, Type
 from nadeshiko.utils import Peekable
 
 
@@ -220,7 +220,13 @@ class Parse:
             next(self.tokens)
             return new_number(token.value, token)
         if token.type == TokenType.Identifier:
-            next(self.tokens)
+            last_token = next(self.tokens)
+            if equal(self.tokens.peek(), "("):
+                node = new_node(NodeKind.FunctionCall, token)
+                node.function_name = last_token.expression
+                next(self.tokens)
+                next(self.tokens)
+                return node
             obj = search_obj(token.expression, self.local_objs)
             if not obj:
                 print(
