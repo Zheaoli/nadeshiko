@@ -2,7 +2,6 @@ import typer
 
 from nadeshiko.codegen import codegen
 from nadeshiko.parse import Parse
-from nadeshiko.token import TokenType
 from nadeshiko.tokenize import tokenize
 
 app = typer.Typer()

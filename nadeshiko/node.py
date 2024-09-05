@@ -46,6 +46,7 @@ class Node:
     token: Optional["Token"] = None
     node_type: Optional["Type"] = None
     function_name: Optional[str] = None
+    function_args: list[Optional["Node"]] = None
 
 
 @dataclass

@@ -1,7 +1,5 @@
 from typing import Optional
-from unittest.mock import right
 
-from jupyterlab.galata import configure_jupyter_server
 
 from nadeshiko.helper import error_message
 from nadeshiko.node import (
@@ -222,11 +220,7 @@ class Parse:
         if token.type == TokenType.Identifier:
             last_token = next(self.tokens)
             if equal(self.tokens.peek(), "("):
-                node = new_node(NodeKind.FunctionCall, token)
-                node.function_name = last_token.expression
-                next(self.tokens)
-                next(self.tokens)
-                return node
+                return self.function_call(last_token)
             obj = search_obj(token.expression, self.local_objs)
             if not obj:
                 print(
@@ -238,6 +232,20 @@ class Parse:
             return new_var_node(obj, token)
         print(error_message(token.expression, token.location, "expected an expression"))
         exit(1)
+
+    def function_call(self, function_token: Token) -> Optional["Node"]:
+        token = function_token
+        skip(next(self.tokens), "(")
+        nodes = []
+        while not equal(self.tokens.peek(), ")"):
+            if nodes:
+                skip(next(self.tokens), ",")
+            nodes.append(self.convert_assign_token())
+        skip(next(self.tokens), ")")
+        node = new_node(NodeKind.FunctionCall, token)
+        node.function_name = token.expression
+        node.function_args = nodes
+        return node
 
     def new_add(self, left: Node, right: Node, token: Token) -> Node:
         add_type(left)

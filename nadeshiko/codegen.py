@@ -1,5 +1,7 @@
 from nadeshiko.node import Node, NodeKind, Function
 
+FUNCTION_ARGS_REGISTER = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+
 
 def count() -> int:
     i = 1
@@ -133,6 +135,11 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
             global_stmt.append("  mov %rax, (%rdi)\n")
             return depth
         case NodeKind.FunctionCall:
+            for item in node.function_args:
+                depth = generate_asm(global_stmt, item, depth)
+                depth = push(depth)
+            for i in range(len(node.function_args) - 1, -1, -1):
+                depth = pop(FUNCTION_ARGS_REGISTER[i], depth)
             global_stmt.append("  mov $0, %rax\n")
             global_stmt.append(f"  call {node.function_name}\n")
             return depth
