@@ -10,7 +10,6 @@ U = TypeVar("U")
 
 
 class Peekable(Generic[T], Iterator[T]):
-
     def __init__(self, iterable: Iterable[T]):
         self._it = iter(iterable)
         self._cache = deque()
@@ -26,10 +25,12 @@ class Peekable(Generic[T], Iterator[T]):
         return True
 
     @overload
-    def peek(self) -> T: ...
+    def peek(self) -> T:
+        ...
 
     @overload
-    def peek(self, default: U) -> T | U: ...
+    def peek(self, default: U) -> T | U:
+        ...
 
     def peek(self, default: Optional[U] = None) -> T | U:
         if not self._cache:

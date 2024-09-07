@@ -17,7 +17,7 @@ from nadeshiko.node import (
 )
 from nadeshiko.token import TokenType, equal, skip, Token
 from nadeshiko.tokenize import consume
-from nadeshiko.type import is_integer, TYPE_INT, pointer_to, Type
+from nadeshiko.type import is_integer, TYPE_INT, pointer_to, Type, function_type
 from nadeshiko.utils import Peekable
 
 
@@ -29,11 +29,20 @@ class Parse:
         self.tokens = tokens
         self.local_objs = [None]
 
-    def parse_stmt(self) -> Optional["Function"]:
+    def function(self) -> Optional["Function"]:
+        obj_type = self.declspac()
+        obj_type = self.declarator(obj_type)
+        self.local_objs = [None]
         skip(next(self.tokens), "{")
         node = self.convert_compound_stmt()
         self.local_objs.pop(0)
-        return Function(node, self.local_objs, 0)
+        return Function(node, self.local_objs.copy(), 0, name=obj_type.name)
+
+    def parse_stmt(self) -> list["Function"]:
+        functions = []
+        while self.tokens.peek().type != TokenType.EOF:
+            functions.append(self.function())
+        return functions
 
     def parse_stmt_return(self) -> Optional[Node]:
         token = self.tokens.peek()
@@ -318,8 +327,9 @@ class Parse:
                 )
             )
             exit(1)
-        obj_type.name = self.tokens.peek().expression
-        next(self.tokens)
+        last_token = next(self.tokens)
+        obj_type = self.type_suffix(obj_type)
+        obj_type.name = last_token.expression
         return obj_type
 
     def declaration(self) -> Optional["Node"]:
@@ -347,10 +357,18 @@ class Parse:
                 NodeKind.ExpressionStmt, node, self.tokens.peek()
             )
             current = current.next_node
+
         node = new_node(NodeKind.Block, self.tokens.peek())
         node.body = head.next_node
         next(self.tokens)
         return node
+
+    def type_suffix(self, node_type: Optional["Type"]) -> Type:
+        if equal(self.tokens.peek(), "("):
+            next(self.tokens)
+            skip(next(self.tokens), ")")
+            return function_type(node_type)
+        return node_type
 
 
 def search_obj(obj: str, local_objs: list["Obj"]) -> Optional[Obj]:

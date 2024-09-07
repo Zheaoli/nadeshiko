@@ -13,57 +13,63 @@ def align_to(offset: int, align: int) -> int:
     return (offset + align - 1) // align * align
 
 
-def assign_lvar_offsets(prog: Function) -> None:
-    offset = 0
-    for obj in prog.locals_obj[::-1]:
-        offset += 8
-        obj.offset = -offset
-    prog.stack_size = align_to(offset, 16)
+def assign_lvar_offsets(prog: list[Function]) -> None:
+    for function in prog:
+        offset = 0
+        for obj in function.locals_obj[::-1]:
+            offset += 8
+            obj.offset = -offset
+        function.stack_size = align_to(offset, 16)
 
 
-def codegen(prog: Function) -> str:
+def codegen(prog: list["Function"]) -> str:
     assign_lvar_offsets(prog)
-    result = [
-        f"  .global main\n",
-        f"main:\n",
-        f"  push %rbp\n",
-        f"  mov %rsp, %rbp\n",
-        f"  sub ${prog.stack_size}, %rsp\n",
-    ]
-    depth = generate_stmt(result, prog.body, 0)
-    assert depth == 0
-    result.append(".L.return:\n")
-    result.append("  mov %rbp, %rsp\n")
-    result.append("  pop %rbp\n")
-    result.append("  ret\n")
-    return "".join(result)
+    final_result = []
+    for function in prog:
+        result = [
+            f"  .global {function.name}\n",
+            f"{function.name}:\n",
+            f"  push %rbp\n",
+            f"  mov %rsp, %rbp\n",
+            f"  sub ${function.stack_size}, %rsp\n",
+        ]
+        depth = generate_stmt(result, function, function.body, 0)
+        assert depth == 0
+        result.append(f".L.return.{function.name}:\n")
+        result.append("  mov %rbp, %rsp\n")
+        result.append("  pop %rbp\n")
+        result.append("  ret\n")
+        final_result.extend(result)
+    return "".join(final_result)
 
 
-def generate_stmt(global_stmt: list[str], node: Node, depth: int) -> (list[str], int):
+def generate_stmt(
+    global_stmt: list[str], current_function: Function, node: Node, depth: int
+) -> (list[str], int):
     match node.kind:
         case NodeKind.If:
             c = count()
             depth = generate_asm(global_stmt, node.condition, depth)
             global_stmt.append(f"  cmp $0, %rax\n")
             global_stmt.append(f"  je .L.else{c}\n")
-            depth = generate_stmt(global_stmt, node.then, depth)
+            depth = generate_stmt(global_stmt, current_function, node.then, depth)
 
             global_stmt.append(f"  jmp .L.end{c}\n")
             global_stmt.append(f".L.else{c}:\n")
             if node.els:
-                depth = generate_stmt(global_stmt, node.els, depth)
+                depth = generate_stmt(global_stmt, current_function, node.els, depth)
             global_stmt.append(f".L.end{c}:\n")
             return depth
         case NodeKind.ForStmt:
             c = count()
             if node.init:
-                depth = generate_stmt(global_stmt, node.init, depth)
+                depth = generate_stmt(global_stmt, current_function, node.init, depth)
             global_stmt.append(f".L.begin{c}:\n")
             if node.condition:
                 depth = generate_asm(global_stmt, node.condition, depth)
                 global_stmt.append(f"  cmp $0, %rax\n")
                 global_stmt.append(f"  je .L.end{c}\n")
-            depth = generate_stmt(global_stmt, node.then, depth)
+            depth = generate_stmt(global_stmt, current_function, node.then, depth)
             if node.inc:
                 depth = generate_asm(global_stmt, node.inc, depth)
             global_stmt.append(f"  jmp .L.begin{c}\n")
@@ -74,13 +80,12 @@ def generate_stmt(global_stmt: list[str], node: Node, depth: int) -> (list[str],
             return depth
         case NodeKind.Return:
             depth = generate_asm(global_stmt, node.left, depth)
-
-            global_stmt.append("  jmp .L.return\n")
+            global_stmt.append(f"  jmp .L.return.{current_function.name}\n")
             return depth
         case NodeKind.Block:
             node = node.body
             while node:
-                depth = generate_stmt(global_stmt, node, depth)
+                depth = generate_stmt(global_stmt, current_function, node, depth)
                 node = node.next_node
             return depth
     raise ValueError("invalid node type")

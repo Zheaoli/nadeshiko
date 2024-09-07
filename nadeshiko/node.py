@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Optional
 
@@ -62,6 +62,8 @@ class Function:
     body: Optional[Node]
     locals_obj: list[Optional["Obj"]]
     stack_size: Optional[int]
+    next_function: Optional["Function"] = field(default_factory=list)
+    name: Optional[str] = None
 
 
 def new_node(kind: NodeKind, token: Token) -> Node:
