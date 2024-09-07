@@ -46,7 +46,7 @@ class Node:
     token: Optional["Token"] = None
     node_type: Optional["Type"] = None
     function_name: Optional[str] = None
-    function_args: list[Optional["Node"]] = None
+    function_args: list[Optional["Node"]] = field(default_factory=list)
 
 
 @dataclass
@@ -62,8 +62,9 @@ class Function:
     body: Optional[Node]
     locals_obj: list[Optional["Obj"]]
     stack_size: Optional[int]
-    next_function: Optional["Function"] = field(default_factory=list)
+    next_function: list[Optional["Function"]] = field(default_factory=list)
     name: Optional[str] = None
+    params: list[Optional["Obj"]] = field(default_factory=list)
 
 
 def new_node(kind: NodeKind, token: Token) -> Node:
@@ -119,6 +120,8 @@ def add_type(node: Node) -> None:
     while current:
         add_type(current)
         current = current.next_node
+    for arg in node.function_args:
+        add_type(arg)
     match node.kind:
         case (
             NodeKind.Add

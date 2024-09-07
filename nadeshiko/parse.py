@@ -1,5 +1,7 @@
+from optparse import Option
 from typing import Optional
 
+from graphene.types.field import base_type
 
 from nadeshiko.helper import error_message
 from nadeshiko.node import (
@@ -17,7 +19,14 @@ from nadeshiko.node import (
 )
 from nadeshiko.token import TokenType, equal, skip, Token
 from nadeshiko.tokenize import consume
-from nadeshiko.type import is_integer, TYPE_INT, pointer_to, Type, function_type
+from nadeshiko.type import (
+    is_integer,
+    TYPE_INT,
+    pointer_to,
+    Type,
+    function_type,
+    copy_type,
+)
 from nadeshiko.utils import Peekable
 
 
@@ -32,11 +41,19 @@ class Parse:
     def function(self) -> Optional["Function"]:
         obj_type = self.declspac()
         obj_type = self.declarator(obj_type)
+        function = Function(None, [], None)
         self.local_objs = [None]
+        self.create_param_lvars(obj_type)
+        self.local_objs.pop(0)
+        function.params = self.local_objs.copy()
+
         skip(next(self.tokens), "{")
         node = self.convert_compound_stmt()
-        self.local_objs.pop(0)
-        return Function(node, self.local_objs.copy(), 0, name=obj_type.name)
+        function.body = node
+        function.stack_size = 0
+        function.locals_obj = self.local_objs.copy()
+        function.name = obj_type.name
+        return function
 
     def parse_stmt(self) -> list["Function"]:
         functions = []
@@ -366,9 +383,25 @@ class Parse:
     def type_suffix(self, node_type: Optional["Type"]) -> Type:
         if equal(self.tokens.peek(), "("):
             next(self.tokens)
+            type_objs = []
+            while not equal(self.tokens.peek(), ")"):
+                if type_objs:
+                    skip(next(self.tokens), ",")
+                base_type = self.declspac()
+                obj_type = self.declarator(base_type)
+                type_objs.append(copy_type(obj_type))
+            func_type = function_type(node_type)
+            func_type.params = type_objs
             skip(next(self.tokens), ")")
-            return function_type(node_type)
+            return func_type
         return node_type
+
+    def create_param_lvars(self, param: Optional["Type"]) -> None:
+        if not param:
+            return
+        for temp_param in param.params:
+            self.create_param_lvars(temp_param)
+        new_lvar(param.name, self.local_objs[-1], param, self.local_objs)
 
 
 def search_obj(obj: str, local_objs: list["Obj"]) -> Optional[Obj]:

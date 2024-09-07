@@ -33,6 +33,11 @@ def codegen(prog: list["Function"]) -> str:
             f"  mov %rsp, %rbp\n",
             f"  sub ${function.stack_size}, %rsp\n",
         ]
+        for i in range(len(function.params)):
+            result.append(
+                f"  mov %{FUNCTION_ARGS_REGISTER[i]}, {function.params[i].offset}(%rbp)\n"
+            )
+
         depth = generate_stmt(result, function, function.body, 0)
         assert depth == 0
         result.append(f".L.return.{function.name}:\n")
