@@ -1,7 +1,4 @@
-from optparse import Option
 from typing import Optional
-
-from graphene.types.field import base_type
 
 from nadeshiko.helper import error_message
 from nadeshiko.node import (

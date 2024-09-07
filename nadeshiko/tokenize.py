@@ -1,7 +1,6 @@
 import string
 from typing import Optional
 
-
 from nadeshiko.helper import error_message
 from nadeshiko.token import TokenType, Token, new_token, equal
 from nadeshiko.utils import Peekable

@@ -1,5 +1,4 @@
 from collections import deque
-from itertools import islice
 from typing import TypeVar, Generic, Iterator, Iterable, Self, overload, Optional
 
 
