@@ -23,6 +23,7 @@ from nadeshiko.type import (
     Type,
     function_type,
     copy_type,
+    array_of,
 )
 from nadeshiko.utils import Peekable
 
@@ -42,7 +43,7 @@ class Parse:
         self.local_objs = [None]
         self.create_param_lvars(obj_type)
         self.local_objs.pop(0)
-        function.params = self.local_objs.copy()
+        function.params = self.local_objs.copy()[: len(self.local_objs) - 1]
 
         skip(next(self.tokens), "{")
         node = self.convert_compound_stmt()
@@ -125,6 +126,7 @@ class Parse:
                 node = self.declaration()
             else:
                 node = self.parse_stmt_return()
+            add_type(node)
             current.next_node = node
             current = node
         node = new_node(NodeKind.Block, self.tokens.peek())
@@ -280,7 +282,10 @@ class Parse:
         if not left.node_type.base and not right.node_type.base:
             left, right = right, left
         right = new_binary(
-            NodeKind.Mul, right, new_number(8, token), self.tokens.peek()
+            NodeKind.Mul,
+            right,
+            new_number(left.node_type.base.size, token),
+            self.tokens.peek(),
         )
         return new_binary(NodeKind.Add, left, right, token)
 
@@ -293,7 +298,7 @@ class Parse:
             right = new_binary(
                 NodeKind.Mul,
                 right,
-                new_number(8, self.tokens.peek()),
+                new_number(left.node_type.base.size, self.tokens.peek()),
                 self.tokens.peek(),
             )
             add_type(right)
@@ -306,7 +311,7 @@ class Parse:
             return new_binary(
                 NodeKind.Div,
                 node,
-                new_number(8, self.tokens.peek()),
+                new_number(left.node_type.base.size, self.tokens.peek()),
                 self.tokens.peek(),
             )
         raise ValueError("pointer - pointer")
@@ -377,20 +382,28 @@ class Parse:
         next(self.tokens)
         return node
 
+    def func_params(self, node_type: Optional["Type"]) -> Type:
+        type_objs = []
+        while not equal(self.tokens.peek(), ")"):
+            if type_objs:
+                skip(next(self.tokens), ",")
+            base_type = self.declspac()
+            obj_type = self.declarator(base_type)
+            type_objs.append(copy_type(obj_type))
+        func_type = function_type(node_type)
+        func_type.params = type_objs
+        skip(next(self.tokens), ")")
+        return func_type
+
     def type_suffix(self, node_type: Optional["Type"]) -> Type:
         if equal(self.tokens.peek(), "("):
             next(self.tokens)
-            type_objs = []
-            while not equal(self.tokens.peek(), ")"):
-                if type_objs:
-                    skip(next(self.tokens), ",")
-                base_type = self.declspac()
-                obj_type = self.declarator(base_type)
-                type_objs.append(copy_type(obj_type))
-            func_type = function_type(node_type)
-            func_type.params = type_objs
-            skip(next(self.tokens), ")")
-            return func_type
+            return self.func_params(node_type)
+        if equal(self.tokens.peek(), "["):
+            next(self.tokens)
+            size = get_number(next(self.tokens))
+            skip(next(self.tokens), "]")
+            return array_of(node_type, size)
         return node_type
 
     def create_param_lvars(self, param: Optional["Type"]) -> None:
@@ -406,3 +419,12 @@ def search_obj(obj: str, local_objs: list["Obj"]) -> Optional[Obj]:
         if local_obj and local_obj.name == obj:
             return local_obj
     return None
+
+
+def get_number(token: Token) -> int:
+    if token.type != TokenType.Number:
+        print(
+            error_message(token.original_expression, token.location, "expected number")
+        )
+        exit(1)
+    return token.value

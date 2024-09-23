@@ -123,14 +123,12 @@ def add_type(node: Node) -> None:
     for arg in node.function_args:
         add_type(arg)
     match node.kind:
-        case (
-            NodeKind.Add
-            | NodeKind.Sub
-            | NodeKind.Mul
-            | NodeKind.Div
-            | NodeKind.Neg
-            | NodeKind.Assign
-        ):
+        case (NodeKind.Add | NodeKind.Sub | NodeKind.Mul | NodeKind.Div | NodeKind.Neg):
+            node.node_type = node.left.node_type
+            return
+        case NodeKind.Assign:
+            if node.left.node_type.kind == TypeKind.TYPE_ARRAY:
+                raise ValueError("invalid array assignment")
             node.node_type = node.left.node_type
             return
         case (
@@ -147,10 +145,13 @@ def add_type(node: Node) -> None:
             node.node_type = node.var.object_type
             return
         case NodeKind.Addr:
-            node.node_type = pointer_to(node.left.node_type)
+            if node.left.node_type.kind == TypeKind.TYPE_ARRAY:
+                node.node_type = pointer_to(node.left.node_type.base)
+            else:
+                node.node_type = pointer_to(node.left.node_type)
             return
         case NodeKind.Deref:
-            if node.left.node_type.kind == TypeKind.TYPE_PTR:
+            if not node.left.node_type.kind:
                 raise ValueError("invalid pointer dereference")
             node.node_type = node.left.node_type.base
             return

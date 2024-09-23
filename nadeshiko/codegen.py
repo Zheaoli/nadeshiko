@@ -1,4 +1,5 @@
 from nadeshiko.node import Node, NodeKind, Function
+from nadeshiko.type import Type, TypeKind
 
 FUNCTION_ARGS_REGISTER = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
 
@@ -17,7 +18,7 @@ def assign_lvar_offsets(prog: list[Function]) -> None:
     for function in prog:
         offset = 0
         for obj in function.locals_obj[::-1]:
-            offset += 8
+            offset += obj.object_type.size
             obj.offset = -offset
         function.stack_size = align_to(offset, 16)
 
@@ -118,6 +119,16 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
         global_stmt.append(f"  pop %{register}\n")
         return depth - 1
 
+    def load(node_type: Type):
+        if node_type.kind == TypeKind.TYPE_ARRAY:
+            return None
+        global_stmt.append(f"  mov (%rax), %rax\n")
+
+    def store(depth: int) -> int:
+        depth = pop("rdi", depth)
+        global_stmt.append("  mov %rax, (%rdi)\n")
+        return depth
+
     match node.kind:
         case NodeKind.Number:
             global_stmt.append(f"  mov ${node.value}, %rax\n")
@@ -128,21 +139,20 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
             return depth
         case NodeKind.Variable:
             depth = generate_address(global_stmt, node, depth)
-            global_stmt.append(f"  mov (%rax), %rax\n")
+            load(node.node_type)
             return depth
         case NodeKind.Addr:
             depth = generate_address(global_stmt, node.left, depth)
             return depth
         case NodeKind.Deref:
             depth = generate_asm(global_stmt, node.left, depth)
-            global_stmt.append(f"  mov (%rax), %rax\n")
+            load(node.node_type)
             return depth
         case NodeKind.Assign:
             depth = generate_address(global_stmt, node.left, depth)
             depth = push(depth)
             depth = generate_asm(global_stmt, node.right, depth)
-            depth = pop("rdi", depth)
-            global_stmt.append("  mov %rax, (%rdi)\n")
+            depth = store(depth)
             return depth
         case NodeKind.FunctionCall:
             for item in node.function_args:
