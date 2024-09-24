@@ -214,7 +214,7 @@ class Parse:
             node = self.convert_unary_token()
             node = new_unary(NodeKind.Deref, node, token)
             return node
-        return self.primary_token()
+        return self.postfix()
 
     def convert_mul_token(self) -> Optional[Node]:
         node = self.convert_unary_token()
@@ -279,7 +279,7 @@ class Parse:
             return new_binary(NodeKind.Add, left, right, token)
         if left.node_type.base and right.node_type.base:
             raise ValueError("pointer + pointer")
-        if not left.node_type.base and not right.node_type.base:
+        if not left.node_type.base and right.node_type.base:
             left, right = right, left
         right = new_binary(
             NodeKind.Mul,
@@ -413,6 +413,20 @@ class Parse:
         for temp_param in param.params:
             self.create_param_lvars(temp_param)
         new_lvar(param.name, self.local_objs[-1], param, self.local_objs)
+
+    def postfix(self) -> Optional["Node"]:
+        node = self.primary_token()
+        while equal(self.tokens.peek(), "["):
+            next(self.tokens)
+            token = self.tokens.peek()
+            index_node = self.expression_parse()
+            skip(next(self.tokens), "]")
+            node = new_unary(
+                NodeKind.Deref,
+                self.new_add(node, index_node, token),
+                token,
+            )
+        return node
 
 
 def search_obj(obj: str, local_objs: list["Obj"]) -> Optional[Obj]:
