@@ -403,6 +403,7 @@ class Parse:
             next(self.tokens)
             size = get_number(next(self.tokens))
             skip(next(self.tokens), "]")
+            node_type = self.type_suffix(node_type)
             return array_of(node_type, size)
         return node_type
 
