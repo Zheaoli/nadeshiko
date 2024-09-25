@@ -1,7 +1,8 @@
 from nadeshiko.node import Node, NodeKind, Obj
 from nadeshiko.type import Type, TypeKind
 
-FUNCTION_ARGS_REGISTER = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+ARGS_REGISTER_64 = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
+ARGS_REGISTER_8 = ["dil", "sil", "dl", "cl", "r8b", "r9b"]
 
 
 def count() -> int:
@@ -19,7 +20,7 @@ def assign_local_var_offsets(prog: list[Obj]) -> None:
         if not func_obj.is_function:
             continue
         offset = 0
-        for obj in func_obj.locals_obj[::-1]:
+        for obj in func_obj.locals_obj:
             offset += obj.object_type.size
             obj.offset = -offset
         func_obj.stack_size = align_to(offset, 16)
@@ -49,9 +50,14 @@ def emit_text(prog: list[Obj], global_stmt: list[str]):
         ]
         global_stmt.extend(temp)
         for i in range(len(obj.params)):
-            global_stmt.append(
-                f"  mov %{FUNCTION_ARGS_REGISTER[i]}, {obj.params[i].offset}(%rbp)\n"
-            )
+            if obj.params[i].object_type.size == 1:
+                global_stmt.append(
+                    f"  mov %{ARGS_REGISTER_8[i]}, {obj.params[i].offset}(%rbp)\n"
+                )
+            else:
+                global_stmt.append(
+                    f"  mov %{ARGS_REGISTER_64[i]}, {obj.params[i].offset}(%rbp)\n"
+                )
         depth = generate_stmt(global_stmt, obj, obj.body, 0)
         assert depth == 0
         global_stmt.append(f".L.return.{obj.name}:\n")
@@ -144,11 +150,17 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
     def load(node_type: Type):
         if node_type.kind == TypeKind.TYPE_ARRAY:
             return None
-        global_stmt.append(f"  mov (%rax), %rax\n")
+        if node_type.size == 1:
+            global_stmt.append(f"  movsbq (%rax), %rax\n")
+        else:
+            global_stmt.append(f"  mov (%rax), %rax\n")
 
-    def store(depth: int) -> int:
+    def store(depth: int, ty: Type) -> int:
         depth = pop("rdi", depth)
-        global_stmt.append("  mov %rax, (%rdi)\n")
+        if ty.size == 1:
+            global_stmt.append("  mov %al, (%rdi)\n")
+        else:
+            global_stmt.append("  mov %rax, (%rdi)\n")
         return depth
 
     match node.kind:
@@ -174,14 +186,14 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
             depth = generate_address(global_stmt, node.left, depth)
             depth = push(depth)
             depth = generate_asm(global_stmt, node.right, depth)
-            depth = store(depth)
+            depth = store(depth, node.node_type)
             return depth
         case NodeKind.FunctionCall:
             for item in node.function_args:
                 depth = generate_asm(global_stmt, item, depth)
                 depth = push(depth)
             for i in range(len(node.function_args) - 1, -1, -1):
-                depth = pop(FUNCTION_ARGS_REGISTER[i], depth)
+                depth = pop(ARGS_REGISTER_64[i], depth)
             global_stmt.append("  mov $0, %rax\n")
             global_stmt.append(f"  call {node.function_name}\n")
             return depth

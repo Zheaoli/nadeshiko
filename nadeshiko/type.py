@@ -8,6 +8,7 @@ class TypeKind(IntEnum):
     TYPE_PTR = 2
     TYPE_FUNCTION = 3
     TYPE_ARRAY = 4
+    TYPE_CHAR = 5
 
 
 @dataclass
@@ -23,10 +24,11 @@ class Type:
 
 
 TYPE_INT = Type(TypeKind.TYPE_INT, size=8)
+TYPE_CHAR = Type(TypeKind.TYPE_CHAR, size=1)
 
 
 def is_integer(ty: Type) -> bool:
-    return ty.kind == TypeKind.TYPE_INT
+    return ty.kind == TypeKind.TYPE_CHAR or ty.kind == TypeKind.TYPE_INT
 
 
 def pointer_to(base: Type) -> Type:

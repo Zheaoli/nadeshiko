@@ -28,6 +28,7 @@ from nadeshiko.type import (
     copy_type,
     array_of,
     TypeKind,
+    TYPE_CHAR,
 )
 from nadeshiko.utils import Peekable
 
@@ -53,7 +54,7 @@ class Parse:
         node = self.convert_compound_stmt()
         function.body = node
         function.stack_size = 0
-        function.locals_obj = self.local_objs.copy()
+        function.locals_obj = self.local_objs.copy()[: len(self.local_objs) - 1]
         function.name = obj_type.name
         return function
 
@@ -82,7 +83,7 @@ class Parse:
     def parse_stmt(self) -> list["Obj"]:
         objs = []
         while self.tokens.peek().type != TokenType.EOF:
-            basic_type = self.declspac()
+            basic_type = self.declaration_spec()
             if self.is_function():
                 objs.append(self.function(basic_type))
                 continue
@@ -152,7 +153,7 @@ class Parse:
         head = new_node(NodeKind.Block, self.tokens.peek())
         current = head
         while not equal(self.tokens.peek(), "}"):
-            if equal(self.tokens.peek(), "int"):
+            if is_type_name(self.tokens.peek()):
                 node = self.declaration()
             else:
                 node = self.parse_stmt_return()
@@ -362,8 +363,11 @@ class Parse:
             exit(1)
         return token.expression
 
-    def declspac(self) -> Optional["Type"]:
+    def declaration_spec(self) -> Optional["Type"]:
         token = self.tokens.peek()
+        if equal(token, "char"):
+            next(self.tokens)
+            return TYPE_CHAR
         if equal(token, "int"):
             next(self.tokens)
             return TYPE_INT
@@ -388,7 +392,7 @@ class Parse:
         return obj_type
 
     def declaration(self) -> Optional["Node"]:
-        base_type = self.declspac()
+        base_type = self.declaration_spec()
         head = Node(NodeKind.Block)
         current = head
         i = 0
@@ -421,7 +425,7 @@ class Parse:
         while not equal(self.tokens.peek(), ")"):
             if type_objs:
                 skip(next(self.tokens), ",")
-            base_type = self.declspac()
+            base_type = self.declaration_spec()
             obj_type = self.declarator(base_type)
             type_objs.append(copy_type(obj_type))
         func_type = function_type(node_type)
@@ -477,3 +481,7 @@ def get_number(token: Token) -> int:
         )
         exit(1)
     return token.value
+
+
+def is_type_name(token: Token) -> bool:
+    return equal(token, "int") or equal(token, "char")
