@@ -18,7 +18,7 @@ def get_punctuator_length(expression: str) -> int:
 
 
 def is_keyword(token: Token) -> bool:
-    keywords = {"return", "if", "else", "while", "for", "int"}
+    keywords = {"return", "if", "else", "while", "for", "int", "sizeof"}
     if token.expression in keywords:
         return True
     return False

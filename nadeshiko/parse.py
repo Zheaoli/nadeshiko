@@ -239,6 +239,12 @@ class Parse:
             next_node = self.expression_parse()
             skip(next(self.tokens), ")")
             return next_node
+        if equal(token, "sizeof"):
+            next(self.tokens)
+            token = self.tokens.peek()
+            node = self.convert_unary_token()
+            add_type(node)
+            return new_number(node.node_type.size, token)
         if token.type == TokenType.Number:
             next(self.tokens)
             return new_number(token.value, token)
