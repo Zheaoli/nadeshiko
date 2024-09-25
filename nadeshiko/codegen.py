@@ -25,31 +25,46 @@ def assign_local_var_offsets(prog: list[Obj]) -> None:
         func_obj.stack_size = align_to(offset, 16)
 
 
-def codegen(prog: list["Obj"]) -> str:
-    assign_local_var_offsets(prog)
-    final_result = []
+def emit_data_section(prog: list[Obj], global_stmt: list[str]):
+    for obj in prog:
+        if obj.is_function:
+            continue
+        global_stmt.append(f"  .data\n")
+        global_stmt.append(f"  .global {obj.name}\n")
+        global_stmt.append(f"{obj.name}:\n")
+        global_stmt.append(f"  .zero {obj.object_type.size}\n")
+
+
+def emit_text(prog: list[Obj], global_stmt: list[str]):
     for obj in prog:
         if not obj.is_function:
             continue
-        result = [
-            f"  .global {obj.name}\n",
-            f"  .text\n" f"{obj.name}:\n",
+        global_stmt.append(f"  .global {obj.name}\n")
+        global_stmt.append(f"  .text\n")
+        global_stmt.append(f"{obj.name}:\n")
+        temp = [
             f"  push %rbp\n",
             f"  mov %rsp, %rbp\n",
             f"  sub ${obj.stack_size}, %rsp\n",
         ]
+        global_stmt.extend(temp)
         for i in range(len(obj.params)):
-            result.append(
+            global_stmt.append(
                 f"  mov %{FUNCTION_ARGS_REGISTER[i]}, {obj.params[i].offset}(%rbp)\n"
             )
-
-        depth = generate_stmt(result, obj, obj.body, 0)
+        depth = generate_stmt(global_stmt, obj, obj.body, 0)
         assert depth == 0
-        result.append(f".L.return.{obj.name}:\n")
-        result.append("  mov %rbp, %rsp\n")
-        result.append("  pop %rbp\n")
-        result.append("  ret\n")
-        final_result.extend(result)
+        global_stmt.append(f".L.return.{obj.name}:\n")
+        global_stmt.append("  mov %rbp, %rsp\n")
+        global_stmt.append("  pop %rbp\n")
+        global_stmt.append("  ret\n")
+
+
+def codegen(prog: list["Obj"]) -> str:
+    assign_local_var_offsets(prog)
+    final_result = []
+    emit_data_section(prog, final_result)
+    emit_text(prog, final_result)
     return "".join(final_result)
 
 
@@ -103,7 +118,10 @@ def generate_stmt(
 
 def generate_address(global_stmt: list[str], node: Node, depth: int) -> int:
     if node.kind == NodeKind.Variable:
-        global_stmt.append(f"  lea {node.var.offset}(%rbp), %rax\n")
+        if node.var.is_local:
+            global_stmt.append(f"  lea {node.var.offset}(%rbp), %rax\n")
+        else:
+            global_stmt.append(f"  lea {node.var.name}(%rip), %rax\n")
         return depth
     if node.kind == NodeKind.Deref:
         depth = generate_asm(global_stmt, node.left, depth)

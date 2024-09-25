@@ -1,5 +1,7 @@
+import copy
 from typing import Optional
 
+from django.db.models.expressions import result
 
 from nadeshiko.helper import error_message
 from nadeshiko.node import (
@@ -25,6 +27,7 @@ from nadeshiko.type import (
     function_type,
     copy_type,
     array_of,
+    TypeKind,
 )
 from nadeshiko.utils import Peekable
 
@@ -54,12 +57,37 @@ class Parse:
         function.name = obj_type.name
         return function
 
+    def is_function(self) -> bool:
+        if equal(self.tokens.peek(), ";"):
+            return False
+        tokens = copy.deepcopy(self.tokens)
+        dummy_type = Type()
+        obj_type = self.declarator(dummy_type)
+        self.tokens = tokens
+        return obj_type.kind == TypeKind.TYPE_FUNCTION
+
+    def global_variable(self, basic_type: Type) -> list["Obj"]:
+        first = True
+        results = []
+        while not equal(self.tokens.peek(), ";"):
+            if not first:
+                skip(next(self.tokens), ",")
+            first = False
+            obj_type = self.declarator(basic_type)
+            new_global_var(obj_type.name, obj_type, results)
+        next(self.tokens)
+        self.global_objs.extend(results)
+        return results
+
     def parse_stmt(self) -> list["Obj"]:
-        functions = []
+        objs = []
         while self.tokens.peek().type != TokenType.EOF:
             basic_type = self.declspac()
-            functions.append(self.function(basic_type))
-        return functions
+            if self.is_function():
+                objs.append(self.function(basic_type))
+                continue
+            objs.extend(self.global_variable(basic_type))
+        return objs
 
     def parse_stmt_return(self) -> Optional[Node]:
         token = self.tokens.peek()
@@ -254,7 +282,7 @@ class Parse:
             last_token = next(self.tokens)
             if equal(self.tokens.peek(), "("):
                 return self.function_call(last_token)
-            obj = search_obj(token.expression, self.local_objs)
+            obj = search_obj(token.expression, self.local_objs + self.global_objs)
             if not obj:
                 print(
                     error_message(
