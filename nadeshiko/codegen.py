@@ -1,4 +1,4 @@
-from nadeshiko.node import Node, NodeKind, Function
+from nadeshiko.node import Node, NodeKind, Obj
 from nadeshiko.type import Type, TypeKind
 
 FUNCTION_ARGS_REGISTER = ["rdi", "rsi", "rdx", "rcx", "r8", "r9"]
@@ -14,34 +14,38 @@ def align_to(offset: int, align: int) -> int:
     return (offset + align - 1) // align * align
 
 
-def assign_lvar_offsets(prog: list[Function]) -> None:
-    for function in prog:
+def assign_local_var_offsets(prog: list[Obj]) -> None:
+    for func_obj in prog:
+        if not func_obj.is_function:
+            continue
         offset = 0
-        for obj in function.locals_obj[::-1]:
+        for obj in func_obj.locals_obj[::-1]:
             offset += obj.object_type.size
             obj.offset = -offset
-        function.stack_size = align_to(offset, 16)
+        func_obj.stack_size = align_to(offset, 16)
 
 
-def codegen(prog: list["Function"]) -> str:
-    assign_lvar_offsets(prog)
+def codegen(prog: list["Obj"]) -> str:
+    assign_local_var_offsets(prog)
     final_result = []
-    for function in prog:
+    for obj in prog:
+        if not obj.is_function:
+            continue
         result = [
-            f"  .global {function.name}\n",
-            f"{function.name}:\n",
+            f"  .global {obj.name}\n",
+            f"  .text\n" f"{obj.name}:\n",
             f"  push %rbp\n",
             f"  mov %rsp, %rbp\n",
-            f"  sub ${function.stack_size}, %rsp\n",
+            f"  sub ${obj.stack_size}, %rsp\n",
         ]
-        for i in range(len(function.params)):
+        for i in range(len(obj.params)):
             result.append(
-                f"  mov %{FUNCTION_ARGS_REGISTER[i]}, {function.params[i].offset}(%rbp)\n"
+                f"  mov %{FUNCTION_ARGS_REGISTER[i]}, {obj.params[i].offset}(%rbp)\n"
             )
 
-        depth = generate_stmt(result, function, function.body, 0)
+        depth = generate_stmt(result, obj, obj.body, 0)
         assert depth == 0
-        result.append(f".L.return.{function.name}:\n")
+        result.append(f".L.return.{obj.name}:\n")
         result.append("  mov %rbp, %rsp\n")
         result.append("  pop %rbp\n")
         result.append("  ret\n")
@@ -50,7 +54,7 @@ def codegen(prog: list["Function"]) -> str:
 
 
 def generate_stmt(
-    global_stmt: list[str], current_function: Function, node: Node, depth: int
+    global_stmt: list[str], current_function: Obj, node: Node, depth: int
 ) -> (list[str], int):
     match node.kind:
         case NodeKind.If:

@@ -1,5 +1,6 @@
 from typing import Optional
 
+
 from nadeshiko.helper import error_message
 from nadeshiko.node import (
     Node,
@@ -9,10 +10,10 @@ from nadeshiko.node import (
     new_number,
     new_var_node,
     Obj,
-    new_lvar,
-    Function,
+    new_local_var,
     new_node,
     add_type,
+    new_global_var,
 )
 from nadeshiko.token import TokenType, equal, skip, Token
 from nadeshiko.tokenize import consume
@@ -35,16 +36,16 @@ class Parse:
     def __init__(self, tokens: Peekable[Optional[Token]]) -> None:
         self.tokens = tokens
         self.local_objs = [None]
+        self.global_objs = []
 
-    def function(self) -> Optional["Function"]:
-        obj_type = self.declspac()
-        obj_type = self.declarator(obj_type)
-        function = Function(None, [], None)
+    def function(self, basic_type: Type) -> Optional["Obj"]:
+        obj_type = self.declarator(basic_type)
+        function = new_global_var(obj_type.name, obj_type, self.global_objs)
+        function.is_function = True
         self.local_objs = [None]
-        self.create_param_lvars(obj_type)
+        self.create_param_local_vars(obj_type)
         self.local_objs.pop(0)
         function.params = self.local_objs.copy()[: len(self.local_objs) - 1]
-
         skip(next(self.tokens), "{")
         node = self.convert_compound_stmt()
         function.body = node
@@ -53,10 +54,11 @@ class Parse:
         function.name = obj_type.name
         return function
 
-    def parse_stmt(self) -> list["Function"]:
+    def parse_stmt(self) -> list["Obj"]:
         functions = []
         while self.tokens.peek().type != TokenType.EOF:
-            functions.append(self.function())
+            basic_type = self.declspac()
+            functions.append(self.function(basic_type))
         return functions
 
     def parse_stmt_return(self) -> Optional[Node]:
@@ -367,9 +369,7 @@ class Parse:
             if i > 1:
                 skip(next(self.tokens), ",")
             obj_type = self.declarator(base_type)
-            obj = new_lvar(
-                obj_type.name, self.local_objs[-1], obj_type, self.local_objs
-            )
+            obj = new_local_var(obj_type.name, obj_type, self.local_objs)
             if not equal(self.tokens.peek(), "="):
                 continue
             left_node = new_var_node(obj, self.tokens.peek())
@@ -413,12 +413,12 @@ class Parse:
             return array_of(node_type, size)
         return node_type
 
-    def create_param_lvars(self, param: Optional["Type"]) -> None:
+    def create_param_local_vars(self, param: Optional["Type"]) -> None:
         if not param:
             return
         for temp_param in param.params:
-            self.create_param_lvars(temp_param)
-        new_lvar(param.name, self.local_objs[-1], param, self.local_objs)
+            self.create_param_local_vars(temp_param)
+        new_local_var(param.name, param, self.local_objs)
 
     def postfix(self) -> Optional["Node"]:
         node = self.primary_token()

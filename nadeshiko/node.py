@@ -51,20 +51,16 @@ class Node:
 
 @dataclass
 class Obj:
-    next_obj: Optional["Obj"] = None
     name: Optional[str] = None
     offset: Optional[int] = None
     object_type: Optional["Type"] = None
-
-
-@dataclass
-class Function:
-    body: Optional[Node]
-    locals_obj: list[Optional["Obj"]]
-    stack_size: Optional[int]
-    next_function: list[Optional["Function"]] = field(default_factory=list)
-    name: Optional[str] = None
+    body: Optional[Node] = None
+    locals_obj: list[Optional["Obj"]] = field(default_factory=list)
+    next_obj: list[Optional["Obj"]] = field(default_factory=list)
+    stack_size: Optional[int] = None
     params: list[Optional["Obj"]] = field(default_factory=list)
+    is_local: bool = False
+    is_function: bool = False
 
 
 def new_node(kind: NodeKind, token: Token) -> Node:
@@ -98,11 +94,19 @@ def new_var_node(obj: Obj, token: Token) -> Node:
     return node
 
 
-def new_lvar(
-    name: str, next_obj: Obj, object_type: Optional["Type"], objs: list["Obj"]
+def new_local_var(
+    name: str,
+    object_type: Optional["Type"],
+    local_objs: list["Obj"],
 ) -> Obj:
-    obj = Obj(next_obj, name, 0, object_type)
-    objs.append(obj)
+    obj = Obj(name, 0, object_type, next_obj=[], is_local=True)
+    local_objs.append(obj)
+    return obj
+
+
+def new_global_var(name: str, object_type: Optional["Type"], global_objs: list["Obj"]):
+    obj = Obj(name, 0, object_type, next_obj=global_objs, is_local=False)
+    global_objs.append(obj)
     return obj
 
 
