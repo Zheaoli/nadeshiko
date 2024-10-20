@@ -18,18 +18,60 @@ def get_punctuator_length(expression: str) -> int:
     return 1 if expression[0] in string.printable else 0
 
 
+def read_escape_char(expression: str, index: int) -> str:
+    match expression[index]:
+        case "a":
+            return "\a"
+        case "b":
+            return "\b"
+        case "f":
+            return "\f"
+        case "n":
+            return "\n"
+        case "r":
+            return "\r"
+        case "t":
+            return "\t"
+        case "v":
+            return "\v"
+        case "e":
+            return chr(27)
+        case _:
+            return expression[index]
+
+
 def read_string_literal(expression: str, index: int) -> tuple[Token, int]:
     end = -1
-    for i in range(index + 1, len(expression)):
+    i = index + 1
+    while i <= len(expression):
         if expression[i] == '"':
             end = i
             break
         if expression[i] == "\0" or expression[i] == "\n":
             print(error_message(expression, index, "unterminated string"))
             exit(1)
+        if expression[i] == "\\":
+            i += 1
+        i += 1
+    length = 0
+    results = []
+    i = index + 1
+    while i < end:
+        if expression[i] != '"':
+            if expression[i] == "\\":
+                results.append(read_escape_char(expression, i + 1))
+                i += 1
+                length += 1
+            else:
+                results.append(expression[i])
+                i += 1
+                length += 1
+        i += 1
+    str_value = "".join(results)
+
     token = new_token(TokenType.STRING, index, end + 1)
-    token.str_type = array_of(TYPE_CHAR, end - index)
-    token.str_value = expression[index + 1 : end]
+    token.str_type = array_of(TYPE_CHAR, length + 1)
+    token.str_value = str_value
     return token, end + 1
 
 
