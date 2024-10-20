@@ -40,7 +40,7 @@ class Parse:
     def __init__(self, tokens: Peekable[Optional[Token]]) -> None:
         self.tokens = tokens
         self.local_objs = [None]
-        self.global_objs = []
+        self.global_objs: list[Obj] = []
 
     def function(self, basic_type: Type) -> Optional["Obj"]:
         obj_type = self.declarator(basic_type)
@@ -82,12 +82,13 @@ class Parse:
 
     def parse_stmt(self) -> list["Obj"]:
         objs = []
-        while self.tokens.peek().type != TokenType.EOF:
+        while self.tokens.peek().kind != TokenType.EOF:
             basic_type = self.declaration_spec()
             if self.is_function():
                 objs.append(self.function(basic_type))
                 continue
-            objs.extend(self.global_variable(basic_type))
+            self.global_variable(basic_type)
+        objs.extend([item for item in self.global_objs if not item.is_function])
         return objs
 
     def parse_stmt_return(self) -> Optional[Node]:
@@ -276,10 +277,14 @@ class Parse:
             node = self.convert_unary_token()
             add_type(node)
             return new_number(node.node_type.size, token)
-        if token.type == TokenType.Number:
+        if token.kind == TokenType.Number:
             next(self.tokens)
             return new_number(token.value, token)
-        if token.type == TokenType.Identifier:
+        if token.kind == TokenType.STRING:
+            var = new_string_literal(token.str_value, token.str_type, self.global_objs)
+            next(self.tokens)
+            return new_var_node(var, token)
+        if token.kind == TokenType.Identifier:
             last_token = next(self.tokens)
             if equal(self.tokens.peek(), "("):
                 return self.function_call(last_token)
@@ -354,7 +359,7 @@ class Parse:
         raise ValueError("pointer - pointer")
 
     def get_indet(self, token: Token) -> str:
-        if token.type != TokenType.Identifier:
+        if token.kind != TokenType.Identifier:
             print(
                 error_message(
                     token.original_expression, token.location, "expected identifier"
@@ -377,7 +382,7 @@ class Parse:
     def declarator(self, obj_type: Optional["Type"]) -> Optional["Type"]:
         while consume(self.tokens, "*"):
             obj_type = pointer_to(obj_type)
-        if self.tokens.peek().type != TokenType.Identifier:
+        if self.tokens.peek().kind != TokenType.Identifier:
             print(
                 error_message(
                     self.tokens.peek().original_expression,
@@ -475,7 +480,7 @@ def search_obj(obj: str, local_objs: list["Obj"]) -> Optional[Obj]:
 
 
 def get_number(token: Token) -> int:
-    if token.type != TokenType.Number:
+    if token.kind != TokenType.Number:
         print(
             error_message(token.original_expression, token.location, "expected number")
         )
@@ -485,3 +490,21 @@ def get_number(token: Token) -> int:
 
 def is_type_name(token: Token) -> bool:
     return equal(token, "int") or equal(token, "char")
+
+
+def net_unique_name() -> str:
+    uid = 0
+    return f".L..{uid}"
+
+
+def new_anon_gvar(node_type: Type, global_objs: list["Obj"]) -> Obj:
+    name = net_unique_name()
+    return new_global_var(name, node_type, global_objs)
+
+
+def new_string_literal(
+    string_value: str, node_type: Type, global_objs: list["Obj"]
+) -> Obj:
+    var = new_anon_gvar(node_type, global_objs)
+    var.init_data = string_value
+    return var

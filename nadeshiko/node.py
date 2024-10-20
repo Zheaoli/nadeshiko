@@ -61,6 +61,7 @@ class Obj:
     params: list[Optional["Obj"]] = field(default_factory=list)
     is_local: bool = False
     is_function: bool = False
+    init_data: str = ""
 
 
 def new_node(kind: NodeKind, token: Token) -> Node:

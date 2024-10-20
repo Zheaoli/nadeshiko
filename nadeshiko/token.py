@@ -3,6 +3,7 @@ from enum import IntEnum
 from typing import Optional
 
 from nadeshiko.helper import error_message
+from nadeshiko.type import Type
 
 
 class TokenType(IntEnum):
@@ -11,16 +12,19 @@ class TokenType(IntEnum):
     EOF = 3
     Identifier = 4
     Keyword = 5
+    STRING = 6
 
 
 @dataclass
 class Token:
-    type: Optional[TokenType] = None
+    kind: Optional[TokenType] = None
     value: Optional[int] = None
     location: Optional[int] = None
     length: Optional[int] = None
     expression: Optional[str] = None
     original_expression: Optional[str] = None
+    str_value: Optional[str] = None
+    str_type: Optional["Type"] = None
 
 
 def new_token(
@@ -30,7 +34,7 @@ def new_token(
 
 
 def get_number(token: Token) -> int:
-    if token.type != TokenType.Number:
+    if token.kind != TokenType.Number:
         print(
             error_message(token.original_expression, token.location, "expected number")
         )

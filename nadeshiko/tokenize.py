@@ -3,6 +3,7 @@ from typing import Optional
 
 from nadeshiko.helper import error_message
 from nadeshiko.token import TokenType, Token, new_token, equal
+from nadeshiko.type import array_of, TYPE_CHAR
 from nadeshiko.utils import Peekable
 
 
@@ -17,6 +18,21 @@ def get_punctuator_length(expression: str) -> int:
     return 1 if expression[0] in string.printable else 0
 
 
+def read_string_literal(expression: str, index: int) -> tuple[Token, int]:
+    end = -1
+    for i in range(index + 1, len(expression)):
+        if expression[i] == '"':
+            end = i
+            break
+        if expression[i] == "\0" or expression[i] == "\n":
+            print(error_message(expression, index, "unterminated string"))
+            exit(1)
+    token = new_token(TokenType.STRING, index, end + 1)
+    token.str_type = array_of(TYPE_CHAR, end - index)
+    token.str_value = expression[index + 1 : end]
+    return token, end + 1
+
+
 def is_keyword(token: Token) -> bool:
     keywords = {"return", "if", "else", "while", "for", "int", "sizeof", "char"}
     if token.expression in keywords:
@@ -27,7 +43,7 @@ def is_keyword(token: Token) -> bool:
 def convert_keyword(tokens: list[Optional[Token]]) -> None:
     for token in tokens:
         if is_keyword(token):
-            token.type = TokenType.Keyword
+            token.kind = TokenType.Keyword
 
 
 def tokenize(expression: str) -> Peekable[Optional[Token]]:
@@ -36,6 +52,10 @@ def tokenize(expression: str) -> Peekable[Optional[Token]]:
     while index < len(expression):
         if expression[index] == " ":
             index += 1
+            continue
+        if expression[index] == '"':
+            token, index = read_string_literal(expression, index)
+            tokens.append(token)
             continue
         if expression[index].isdigit():
             current = new_token(TokenType.Number, index, index)

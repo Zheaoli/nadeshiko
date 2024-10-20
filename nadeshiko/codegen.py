@@ -33,7 +33,11 @@ def emit_data_section(prog: list[Obj], global_stmt: list[str]):
         global_stmt.append(f"  .data\n")
         global_stmt.append(f"  .global {obj.name}\n")
         global_stmt.append(f"{obj.name}:\n")
-        global_stmt.append(f"  .zero {obj.object_type.size}\n")
+        if obj.init_data != "":
+            for i in range(len(obj.init_data)):
+                global_stmt.append(f"  .byte {ord(obj.init_data[i])}\n")
+        else:
+            global_stmt.append(f"  .zero {obj.object_type.size}\n")
 
 
 def emit_text(prog: list[Obj], global_stmt: list[str]):
