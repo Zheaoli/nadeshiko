@@ -42,11 +42,11 @@ def read_escape_char(expression: str, index: int) -> tuple[str, int]:
     if expression[index] == "x":
         index += 1
         offset = 1
-        if not expression[index].isdigit():
+        if not (expression[index].isdigit() or expression[index] in "abcdefABCDEF"):
             print(error_message(expression, index, "expected hex digit"))
             exit(1)
         value = 0
-        while expression[index].isdigit():
+        while expression[index].isdigit() or expression[index] in "abcdefABCDEF":
             value = value * 16 + from_hex(expression[index])
             index += 1
             offset += 1

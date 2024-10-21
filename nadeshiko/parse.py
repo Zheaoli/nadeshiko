@@ -268,6 +268,12 @@ class Parse:
         token = self.tokens.peek()
         if equal(token, "("):
             next(self.tokens)
+            if equal(self.tokens.peek(), "{"):
+                next(self.tokens)
+                node = new_node(NodeKind.StmtExpression, self.tokens.peek())
+                node.body = self.convert_compound_stmt().body
+                skip(next(self.tokens), ")")
+                return node
             next_node = self.expression_parse()
             skip(next(self.tokens), ")")
             return next_node

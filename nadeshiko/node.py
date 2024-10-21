@@ -27,6 +27,7 @@ class NodeKind(IntEnum):
     Addr = 18
     Deref = 19
     FunctionCall = 20
+    StmtExpression = 21  # GNU extension
 
 
 @dataclass
@@ -160,3 +161,12 @@ def add_type(node: Node) -> None:
                 raise ValueError("invalid pointer dereference")
             node.node_type = node.left.node_type.base
             return
+        case NodeKind.StmtExpression:
+            if node.body:
+                stmt = node.body
+                while stmt.next_node:
+                    stmt = stmt.next_node
+                if stmt.kind == NodeKind.ExpressionStmt:
+                    node.node_type = stmt.left.node_type
+                    return
+            raise ValueError("stmt expr is not a valid expression")

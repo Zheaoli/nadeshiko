@@ -84,7 +84,7 @@ def generate_stmt(
     match node.kind:
         case NodeKind.If:
             c = count()
-            depth = generate_asm(global_stmt, node.condition, depth)
+            depth = generate_asm(global_stmt, current_function, node.condition, depth)
             global_stmt.append(f"  cmp $0, %rax\n")
             global_stmt.append(f"  je .L.else{c}\n")
             depth = generate_stmt(global_stmt, current_function, node.then, depth)
@@ -101,20 +101,22 @@ def generate_stmt(
                 depth = generate_stmt(global_stmt, current_function, node.init, depth)
             global_stmt.append(f".L.begin{c}:\n")
             if node.condition:
-                depth = generate_asm(global_stmt, node.condition, depth)
+                depth = generate_asm(
+                    global_stmt, current_function, node.condition, depth
+                )
                 global_stmt.append(f"  cmp $0, %rax\n")
                 global_stmt.append(f"  je .L.end{c}\n")
             depth = generate_stmt(global_stmt, current_function, node.then, depth)
             if node.inc:
-                depth = generate_asm(global_stmt, node.inc, depth)
+                depth = generate_asm(global_stmt, current_function, node.inc, depth)
             global_stmt.append(f"  jmp .L.begin{c}\n")
             global_stmt.append(f".L.end{c}:\n")
             return depth
         case NodeKind.ExpressionStmt:
-            depth = generate_asm(global_stmt, node.left, depth)
+            depth = generate_asm(global_stmt, current_function, node.left, depth)
             return depth
         case NodeKind.Return:
-            depth = generate_asm(global_stmt, node.left, depth)
+            depth = generate_asm(global_stmt, current_function, node.left, depth)
             global_stmt.append(f"  jmp .L.return.{current_function.name}\n")
             return depth
         case NodeKind.Block:
@@ -126,7 +128,9 @@ def generate_stmt(
     raise ValueError("invalid node type")
 
 
-def generate_address(global_stmt: list[str], node: Node, depth: int) -> int:
+def generate_address(
+    global_stmt: list[str], current_function: Obj, node: Node, depth: int
+) -> int:
     if node.kind == NodeKind.Variable:
         if node.var.is_local:
             global_stmt.append(f"  lea {node.var.offset}(%rbp), %rax\n")
@@ -134,12 +138,14 @@ def generate_address(global_stmt: list[str], node: Node, depth: int) -> int:
             global_stmt.append(f"  lea {node.var.name}(%rip), %rax\n")
         return depth
     if node.kind == NodeKind.Deref:
-        depth = generate_asm(global_stmt, node.left, depth)
+        depth = generate_asm(global_stmt, current_function, node.left, depth)
         return depth
     raise ValueError("invalid node type")
 
 
-def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
+def generate_asm(
+    global_stmt: list[str], current_function: Obj, node: Node, depth: int
+) -> int:
     if not node:
         return depth
 
@@ -172,38 +178,44 @@ def generate_asm(global_stmt: list[str], node: Node, depth: int) -> int:
             global_stmt.append(f"  mov ${node.value}, %rax\n")
             return depth
         case NodeKind.Neg:
-            depth = generate_asm(global_stmt, node.left, depth)
+            depth = generate_asm(global_stmt, current_function, node.left, depth)
             global_stmt.append(f"  neg %rax\n")
             return depth
         case NodeKind.Variable:
-            depth = generate_address(global_stmt, node, depth)
+            depth = generate_address(global_stmt, current_function, node, depth)
             load(node.node_type)
             return depth
         case NodeKind.Addr:
-            depth = generate_address(global_stmt, node.left, depth)
+            depth = generate_address(global_stmt, current_function, node.left, depth)
             return depth
         case NodeKind.Deref:
-            depth = generate_asm(global_stmt, node.left, depth)
+            depth = generate_asm(global_stmt, current_function, node.left, depth)
             load(node.node_type)
             return depth
         case NodeKind.Assign:
-            depth = generate_address(global_stmt, node.left, depth)
+            depth = generate_address(global_stmt, current_function, node.left, depth)
             depth = push(depth)
-            depth = generate_asm(global_stmt, node.right, depth)
+            depth = generate_asm(global_stmt, current_function, node.right, depth)
             depth = store(depth, node.node_type)
+            return depth
+        case NodeKind.StmtExpression:
+            node = node.body
+            while node:
+                depth = generate_stmt(global_stmt, current_function, node, depth)
+                node = node.next_node
             return depth
         case NodeKind.FunctionCall:
             for item in node.function_args:
-                depth = generate_asm(global_stmt, item, depth)
+                depth = generate_asm(global_stmt, current_function, item, depth)
                 depth = push(depth)
             for i in range(len(node.function_args) - 1, -1, -1):
                 depth = pop(ARGS_REGISTER_64[i], depth)
             global_stmt.append("  mov $0, %rax\n")
             global_stmt.append(f"  call {node.function_name}\n")
             return depth
-    depth = generate_asm(global_stmt, node.right, depth)
+    depth = generate_asm(global_stmt, current_function, node.right, depth)
     depth = push(depth)
-    depth = generate_asm(global_stmt, node.left, depth)
+    depth = generate_asm(global_stmt, current_function, node.left, depth)
     depth = pop("rdi", depth)
     match node.kind:
         case NodeKind.Add:
