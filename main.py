@@ -1,4 +1,4 @@
-from nadeshiko.main import app
+from nadeshiko.main import main
 
 if __name__ == "__main__":
-    app()
+    main()

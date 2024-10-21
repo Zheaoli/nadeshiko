@@ -124,7 +124,7 @@ def tokenize(expression: str) -> Peekable[Optional[Token]]:
     index = 0
     tokens = []
     while index < len(expression):
-        if expression[index] == " ":
+        if expression[index] == " " or expression[index] == "\n":
             index += 1
             continue
         if expression[index] == '"':
