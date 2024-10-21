@@ -18,6 +18,16 @@ def get_punctuator_length(expression: str) -> int:
     return 1 if expression[0] in string.printable else 0
 
 
+def from_hex(char: str) -> int:
+    if ord("0") <= ord(char) <= ord("9"):
+        return ord(char) - ord("0")
+    if ord("a") <= ord(char) <= ord("f"):
+        return ord(char) - ord("a") + 10
+    if ord("A") <= ord(char) <= ord("F"):
+        return ord(char) - ord("A") + 10
+    return 0
+
+
 def read_escape_char(expression: str, index: int) -> tuple[str, int]:
     if ord("0") <= ord(expression[index]) <= ord("7"):
         value = ord(expression[index]) - ord("0")
@@ -29,6 +39,18 @@ def read_escape_char(expression: str, index: int) -> tuple[str, int]:
                 value = value * 8 + ord(expression[index]) - ord("0")
                 index += 1
         return chr(value), 3
+    if expression[index] == "x":
+        index += 1
+        offset = 1
+        if not expression[index].isdigit():
+            print(error_message(expression, index, "expected hex digit"))
+            exit(1)
+        value = 0
+        while expression[index].isdigit():
+            value = value * 16 + from_hex(expression[index])
+            index += 1
+            offset += 1
+        return chr(value), offset
     match expression[index]:
         case "a":
             return "\a", 1
