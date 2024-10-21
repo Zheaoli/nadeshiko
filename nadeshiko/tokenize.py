@@ -18,26 +18,36 @@ def get_punctuator_length(expression: str) -> int:
     return 1 if expression[0] in string.printable else 0
 
 
-def read_escape_char(expression: str, index: int) -> str:
+def read_escape_char(expression: str, index: int) -> tuple[str, int]:
+    if ord("0") <= ord(expression[index]) <= ord("7"):
+        value = ord(expression[index]) - ord("0")
+        index += 1
+        if ord("0") <= ord(expression[index]) <= ord("7"):
+            value = value * 8 + ord(expression[index]) - ord("0")
+            index += 1
+            if ord("0") <= ord(expression[index]) <= ord("7"):
+                value = value * 8 + ord(expression[index]) - ord("0")
+                index += 1
+        return chr(value), 3
     match expression[index]:
         case "a":
-            return "\a"
+            return "\a", 1
         case "b":
-            return "\b"
+            return "\b", 1
         case "f":
-            return "\f"
+            return "\f", 1
         case "n":
-            return "\n"
+            return "\n", 1
         case "r":
-            return "\r"
+            return "\r", 1
         case "t":
-            return "\t"
+            return "\t", 1
         case "v":
-            return "\v"
+            return "\v", 1
         case "e":
-            return chr(27)
+            return chr(27), 1
         case _:
-            return expression[index]
+            return expression[index], 1
 
 
 def read_string_literal(expression: str, index: int) -> tuple[Token, int]:
@@ -59,12 +69,12 @@ def read_string_literal(expression: str, index: int) -> tuple[Token, int]:
     while i < end:
         if expression[i] != '"':
             if expression[i] == "\\":
-                results.append(read_escape_char(expression, i + 1))
-                i += 1
+                value, offset = read_escape_char(expression, i + 1)
+                results.append(value)
+                i += offset
                 length += 1
             else:
                 results.append(expression[i])
-                i += 1
                 length += 1
         i += 1
     str_value = "".join(results)
