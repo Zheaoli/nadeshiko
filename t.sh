@@ -13,7 +13,7 @@ assert() {
   expected="$1"
   input="$2"
 
-  echo "$input" | python main.py - > tmp.s || exit
+  echo "$input" | python main.py -o tmp.s - > tmp.s || exit
   gcc -static -o tmp tmp.s tmp2.o
   ./tmp
   actual="$?"

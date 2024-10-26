@@ -9,15 +9,16 @@ from nadeshiko.tokenize import tokenize
 
 @click.command()
 @click.argument("filename", type=click.File("r"), default="-")
-def main(filename: TextIO):
+@click.option("-o", "--output", type=click.File("w"))
+def main(filename: TextIO, output: TextIO):
     expression = filename.read()
     assert len(expression) >= 0
     tokens = tokenize(expression)
     prog = Parse(tokens).parse_stmt()
     result = codegen(prog)
 
-    print(result, flush=True)
+    output.write(result)
 
 
 if __name__ == "__main__":
-    app()
+    main()
