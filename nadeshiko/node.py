@@ -96,18 +96,33 @@ def new_var_node(obj: Obj, token: Token) -> Node:
     return node
 
 
+def new_var(name: str, object_type: Optional["Type"], scope: Optional["Scope"]) -> Obj:
+    obj = Obj(name, 0, object_type, next_obj=[], is_local=False)
+    push_scope(name, obj, scope)
+    return obj
+
+
 def new_local_var(
     name: str,
     object_type: Optional["Type"],
     local_objs: list["Obj"],
+    scope: Optional["Scope"],
 ) -> Obj:
-    obj = Obj(name, 0, object_type, next_obj=[], is_local=True)
+    obj = new_var(name, object_type, scope)
+    obj.is_local = True
     local_objs.append(obj)
     return obj
 
 
-def new_global_var(name: str, object_type: Optional["Type"], global_objs: list["Obj"]):
-    obj = Obj(name, 0, object_type, next_obj=global_objs, is_local=False)
+def new_global_var(
+    name: str,
+    object_type: Optional["Type"],
+    global_objs: list["Obj"],
+    scope: Optional["Scope"],
+) -> Obj:
+    obj = new_var(name, object_type, scope)
+    obj.next_obj = global_objs
+    obj.is_local = False
     global_objs.append(obj)
     return obj
 
@@ -170,3 +185,30 @@ def add_type(node: Node) -> None:
                     node.node_type = stmt.left.node_type
                     return
             raise ValueError("stmt expr is not a valid expression")
+
+
+@dataclass
+class VarScope:
+    next_scope: Optional["VarScope"] = None
+    name: Optional[str] = None
+    var: Optional["Obj"] = None
+
+
+@dataclass
+class Scope:
+    next_scope: Optional["Scope"] = None
+    vars: Optional["VarScope"] = None
+
+
+def enter_scope(next_scope: Optional["Scope"]) -> Scope:
+    return Scope(next_scope, None)
+
+
+def leave_scope(scope: Scope) -> Scope:
+    return scope.next_scope
+
+
+def push_scope(name: str, var: Obj, scope: Scope) -> VarScope:
+    var_scope = VarScope(scope.vars, name, var)
+    scope.vars = var_scope
+    return var_scope

@@ -1,8 +1,6 @@
 import copy
 from typing import Optional
 
-from django.db.models.expressions import result
-
 from nadeshiko.helper import error_message
 from nadeshiko.node import (
     Node,
@@ -16,6 +14,9 @@ from nadeshiko.node import (
     new_node,
     add_type,
     new_global_var,
+    Scope,
+    enter_scope,
+    leave_scope,
 )
 from nadeshiko.token import TokenType, equal, skip, Token
 from nadeshiko.tokenize import consume
@@ -36,17 +37,20 @@ from nadeshiko.utils import Peekable
 class Parse:
     tokens: Peekable[Optional[Token]]
     local_objs: list[Optional["Obj"]]
+    scope: Optional["Scope"] = None
 
     def __init__(self, tokens: Peekable[Optional[Token]]) -> None:
         self.tokens = tokens
         self.local_objs = [None]
         self.global_objs: list[Obj] = []
+        self.scope = Scope()
 
     def function(self, basic_type: Type) -> Optional["Obj"]:
         obj_type = self.declarator(basic_type)
-        function = new_global_var(obj_type.name, obj_type, self.global_objs)
+        function = new_global_var(obj_type.name, obj_type, self.global_objs, self.scope)
         function.is_function = True
         self.local_objs = [None]
+        self.scope = enter_scope(self.scope)
         self.create_param_local_vars(obj_type)
         self.local_objs.pop(0)
         function.params = self.local_objs.copy()[: len(self.local_objs) - 1]
@@ -56,6 +60,7 @@ class Parse:
         function.stack_size = 0
         function.locals_obj = self.local_objs.copy()[: len(self.local_objs) - 1]
         function.name = obj_type.name
+        self.scope = leave_scope(self.scope)
         return function
 
     def is_function(self) -> bool:
@@ -75,7 +80,7 @@ class Parse:
                 skip(next(self.tokens), ",")
             first = False
             obj_type = self.declarator(basic_type)
-            new_global_var(obj_type.name, obj_type, results)
+            new_global_var(obj_type.name, obj_type, results, self.scope)
         next(self.tokens)
         self.global_objs.extend(results)
         return results
@@ -153,6 +158,7 @@ class Parse:
     def convert_compound_stmt(self) -> Optional[Node]:
         head = new_node(NodeKind.Block, self.tokens.peek())
         current = head
+        self.scope = enter_scope(self.scope)
         while not equal(self.tokens.peek(), "}"):
             if is_type_name(self.tokens.peek()):
                 node = self.declaration()
@@ -161,6 +167,7 @@ class Parse:
             add_type(node)
             current.next_node = node
             current = node
+        self.scope = leave_scope(self.scope)
         node = new_node(NodeKind.Block, self.tokens.peek())
         node.body = head.next_node
         next(self.tokens)
@@ -287,14 +294,16 @@ class Parse:
             next(self.tokens)
             return new_number(token.value, token)
         if token.kind == TokenType.STRING:
-            var = new_string_literal(token.str_value, token.str_type, self.global_objs)
+            var = new_string_literal(
+                token.str_value, token.str_type, self.global_objs, self.scope
+            )
             next(self.tokens)
             return new_var_node(var, token)
         if token.kind == TokenType.Identifier:
             last_token = next(self.tokens)
             if equal(self.tokens.peek(), "("):
                 return self.function_call(last_token)
-            obj = search_obj(token.expression, self.local_objs + self.global_objs)
+            obj = search_obj(token.expression, self.scope)
             if not obj:
                 print(
                     error_message(
@@ -412,7 +421,7 @@ class Parse:
             if i > 1:
                 skip(next(self.tokens), ",")
             obj_type = self.declarator(base_type)
-            obj = new_local_var(obj_type.name, obj_type, self.local_objs)
+            obj = new_local_var(obj_type.name, obj_type, self.local_objs, self.scope)
             if not equal(self.tokens.peek(), "="):
                 continue
             left_node = new_var_node(obj, self.tokens.peek())
@@ -461,7 +470,7 @@ class Parse:
             return
         for temp_param in param.params:
             self.create_param_local_vars(temp_param)
-        new_local_var(param.name, param, self.local_objs)
+        new_local_var(param.name, param, self.local_objs, self.scope)
 
     def postfix(self) -> Optional["Node"]:
         node = self.primary_token()
@@ -478,10 +487,14 @@ class Parse:
         return node
 
 
-def search_obj(obj: str, local_objs: list["Obj"]) -> Optional[Obj]:
-    for local_obj in local_objs:
-        if local_obj and local_obj.name == obj:
-            return local_obj
+def search_obj(obj: str, scope: Optional["Scope"]) -> Optional[Obj]:
+    while scope:
+        var_scope = scope.vars
+        while var_scope:
+            if var_scope.name == obj:
+                return var_scope.var
+            var_scope = var_scope.next_scope
+        scope = scope.next_scope
     return None
 
 
@@ -503,14 +516,19 @@ def net_unique_name() -> str:
     return f".L..{uid}"
 
 
-def new_anon_gvar(node_type: Type, global_objs: list["Obj"]) -> Obj:
+def new_anon_gvar(
+    node_type: Type, global_objs: list["Obj"], scope: Optional["Scope"]
+) -> Obj:
     name = net_unique_name()
-    return new_global_var(name, node_type, global_objs)
+    return new_global_var(name, node_type, global_objs, scope)
 
 
 def new_string_literal(
-    string_value: str, node_type: Type, global_objs: list["Obj"]
+    string_value: str,
+    node_type: Type,
+    global_objs: list["Obj"],
+    scope: Optional["Scope"],
 ) -> Obj:
-    var = new_anon_gvar(node_type, global_objs)
+    var = new_anon_gvar(node_type, global_objs, scope)
     var.init_data = string_value
     return var
