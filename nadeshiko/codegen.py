@@ -1,3 +1,4 @@
+from nadeshiko.context import UNIQUE_COUNT_ID
 from nadeshiko.node import Node, NodeKind, Obj
 from nadeshiko.type import Type, TypeKind
 
@@ -6,8 +7,8 @@ ARGS_REGISTER_8 = ["dil", "sil", "dl", "cl", "r8b", "r9b"]
 
 
 def count() -> int:
-    i = 1
-    i += 1
+    i = UNIQUE_COUNT_ID.get()
+    UNIQUE_COUNT_ID.set(i + 1)
     return i
 
 
@@ -20,7 +21,7 @@ def assign_local_var_offsets(prog: list[Obj]) -> None:
         if not func_obj.is_function:
             continue
         offset = 0
-        for obj in func_obj.locals_obj:
+        for obj in func_obj.locals_obj[::-1]:
             offset += obj.object_type.size
             obj.offset = -offset
         func_obj.stack_size = align_to(offset, 16)

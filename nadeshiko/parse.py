@@ -1,6 +1,7 @@
 import copy
 from typing import Optional
 
+from nadeshiko.context import CURRENT_VAR_ID
 from nadeshiko.helper import error_message
 from nadeshiko.node import (
     Node,
@@ -51,14 +52,14 @@ class Parse:
         function.is_function = True
         self.local_objs = [None]
         self.scope = enter_scope(self.scope)
-        self.create_param_local_vars(obj_type)
+        self.create_param_local_vars(obj_type.params)
         self.local_objs.pop(0)
-        function.params = self.local_objs.copy()[: len(self.local_objs) - 1]
+        function.params = self.local_objs.copy()
         skip(next(self.tokens), "{")
         node = self.convert_compound_stmt()
         function.body = node
         function.stack_size = 0
-        function.locals_obj = self.local_objs.copy()[: len(self.local_objs) - 1]
+        function.locals_obj = self.local_objs.copy()
         function.name = obj_type.name
         self.scope = leave_scope(self.scope)
         return function
@@ -465,12 +466,12 @@ class Parse:
             return array_of(node_type, size)
         return node_type
 
-    def create_param_local_vars(self, param: Optional["Type"]) -> None:
-        if not param:
+    def create_param_local_vars(self, params: list[Optional["Type"]]) -> None:
+        if not params:
             return
-        for temp_param in param.params:
-            self.create_param_local_vars(temp_param)
-        new_local_var(param.name, param, self.local_objs, self.scope)
+        for temp_param in params:
+            self.create_param_local_vars(temp_param.params)
+            new_local_var(temp_param.name, temp_param, self.local_objs, self.scope)
 
     def postfix(self) -> Optional["Node"]:
         node = self.primary_token()
@@ -512,8 +513,9 @@ def is_type_name(token: Token) -> bool:
 
 
 def net_unique_name() -> str:
-    uid = 0
-    return f".L..{uid}"
+    current_id = CURRENT_VAR_ID.get()
+    CURRENT_VAR_ID.set(current_id + 1)
+    return f".L..{current_id}"
 
 
 def new_anon_gvar(

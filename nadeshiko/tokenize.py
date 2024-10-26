@@ -99,6 +99,7 @@ def read_string_literal(expression: str, index: int) -> tuple[Token, int]:
                 results.append(expression[i])
                 length += 1
         i += 1
+    results.append("\0")
     str_value = "".join(results)
 
     token = new_token(TokenType.STRING, index, end + 1)
