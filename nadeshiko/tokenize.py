@@ -124,6 +124,17 @@ def tokenize(expression: str) -> Peekable[Optional[Token]]:
     index = 0
     tokens = []
     while index < len(expression):
+        if index <= len(expression) - 2 and expression[index : index + 2] == "//":
+            index += 2
+            while index < len(expression) and expression[index] != "\n":
+                index += 1
+            continue
+        if index <= len(expression) - 2 and expression[index : index + 2] == "/*":
+            try:
+                index = expression.find("*/", index + 2) + 2
+            except ValueError:
+                print(error_message(expression, index, "unterminated comment"))
+                exit(1)
         if expression[index] == " " or expression[index] == "\n":
             index += 1
             continue
