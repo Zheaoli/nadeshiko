@@ -154,7 +154,13 @@ class Parse:
         return node
 
     def expression_parse(self) -> Optional[Node]:
-        return self.convert_assign_token()
+        node = self.convert_assign_token()
+        if equal(self.tokens.peek(), ","):
+            next(self.tokens)
+            return new_binary(
+                NodeKind.Comma, node, self.expression_parse(), self.tokens.peek()
+            )
+        return node
 
     def convert_compound_stmt(self) -> Optional[Node]:
         head = new_node(NodeKind.Block, self.tokens.peek())

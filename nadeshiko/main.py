@@ -8,15 +8,14 @@ from nadeshiko.tokenize import tokenize
 
 
 @click.command()
-@click.argument("filename", type=click.Path(), default="-")
+@click.argument("filename", type=click.File(), default="-")
 @click.option("-o", "--output", type=click.File("w"))
-def main(filename: str, output: TextIO):
-    with open(filename, "r") as fp:
-        expression = fp.read()
+def main(filename: TextIO, output: TextIO):
+    expression = filename.read()
     assert len(expression) >= 0
     tokens = tokenize(expression)
     prog = Parse(tokens).parse_stmt()
-    result = codegen(filename, prog)
+    result = codegen(filename.name, prog)
 
     output.write(result)
 

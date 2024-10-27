@@ -28,6 +28,7 @@ class NodeKind(IntEnum):
     Deref = 19
     FunctionCall = 20
     StmtExpression = 21  # GNU extension
+    Comma = 22
 
 
 @dataclass
@@ -146,6 +147,9 @@ def add_type(node: Node) -> None:
     match node.kind:
         case (NodeKind.Add | NodeKind.Sub | NodeKind.Mul | NodeKind.Div | NodeKind.Neg):
             node.node_type = node.left.node_type
+            return
+        case NodeKind.Comma:
+            node.node_type = node.right.node_type
             return
         case NodeKind.Assign:
             if node.left.node_type.kind == TypeKind.TYPE_ARRAY:
