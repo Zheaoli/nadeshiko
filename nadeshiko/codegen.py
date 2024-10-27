@@ -71,9 +71,9 @@ def emit_text(prog: list[Obj], global_stmt: list[str]):
         global_stmt.append("  ret\n")
 
 
-def codegen(prog: list["Obj"]) -> str:
+def codegen(filename: str, prog: list["Obj"]) -> str:
     assign_local_var_offsets(prog)
-    final_result = []
+    final_result = [f'.file 1 "{filename}"\n']
     emit_data_section(prog, final_result)
     emit_text(prog, final_result)
     return "".join(final_result)
@@ -82,6 +82,7 @@ def codegen(prog: list["Obj"]) -> str:
 def generate_stmt(
     global_stmt: list[str], current_function: Obj, node: Node, depth: int
 ) -> (list[str], int):
+    global_stmt.append(f"  .loc 1 {node.token.line_number}\n")
     match node.kind:
         case NodeKind.If:
             c = count()
@@ -149,6 +150,7 @@ def generate_asm(
 ) -> int:
     if not node:
         return depth
+    global_stmt.append(f"  .loc 1 {node.token.line_number}\n")
 
     def push(depth: int) -> (list[str], depth):
         global_stmt.append("  push %rax\n")
