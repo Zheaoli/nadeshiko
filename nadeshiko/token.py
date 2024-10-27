@@ -25,6 +25,7 @@ class Token:
     original_expression: Optional[str] = None
     str_value: Optional[str] = None
     str_type: Optional["Type"] = None
+    line_number: int = 0
 
 
 def new_token(

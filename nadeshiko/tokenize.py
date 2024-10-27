@@ -121,6 +121,19 @@ def convert_keyword(tokens: list[Optional[Token]]) -> None:
             token.kind = TokenType.Keyword
 
 
+def add_line_number(expression: str, tokens: list[Optional[Token]]) -> None:
+    line_number = 1
+    token_index = 0
+    index = 0
+    while index < len(expression):
+        if index == tokens[token_index].location:
+            tokens[token_index].line_number = line_number
+            token_index += 1
+        if expression[index] == "\n":
+            line_number += 1
+        index += 1
+
+
 def tokenize(expression: str) -> Peekable[Optional[Token]]:
     index = 0
     tokens = []
@@ -178,6 +191,7 @@ def tokenize(expression: str) -> Peekable[Optional[Token]]:
         print(error_message(expression, index, "invalid token"))
         exit(1)
     tokens.append(new_token(TokenType.EOF, index, index))
+    add_line_number(expression, tokens)
     convert_keyword(tokens)
     return Peekable(tokens)
 
